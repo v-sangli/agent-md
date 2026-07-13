@@ -1,0 +1,104 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/session_start.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/access_guard.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/pre_tool_use_bash_guard.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/post_tool_use_privilege_guard.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/post_tool_use_privilege_guard.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "deny": [],
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(sudo:*)"
+    ],
+    "allow": [
+      "Read",
+      "Edit",
+      "Write",
+      "MultiEdit",
+      "Bash(bash .claude/verify_setup.sh:*)",
+      "Bash(.claude/harness/run.sh:*)",
+      "Bash(.claude/skills/tmux-control/scripts/tmux_control.sh:*)",
+      "Bash(grep:*)",
+      "Bash(egrep:*)",
+      "Bash(fgrep:*)",
+      "Bash(pwd:*)",
+      "Bash(which:*)",
+      "Bash(whereis:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git branch:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(less:*)",
+      "Bash(more:*)",
+      "Bash(sed:*)",
+      "Bash(awk:*)",
+      "Bash(cut:*)",
+      "Bash(sort:*)",
+      "Bash(uniq:*)",
+      "Bash(wc:*)",
+      "Bash(nl:*)",
+      "Bash(file:*)",
+      "Bash(stat:*)",
+      "Bash(du:*)",
+      "Bash(df:*)",
+      "Bash(tree:*)",
+      "Bash(rg:*)",
+      "Bash(find:*)",
+      "WebSearch",
+      "WebFetch(*)"
+    ]
+  }
+}

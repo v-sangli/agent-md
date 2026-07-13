@@ -1,0 +1,6 @@
+interface:
+  display_name: "Tmux Control"
+  short_description: "Visible tmux sessions for shell work"
+  default_prompt: "Use $tmux-control to run this benchmark or privileged shell workflow in visible persistent tmux panes."
+policy:
+  allow_implicit_invocation: true

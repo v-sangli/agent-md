@@ -1,0 +1,7 @@
+.tmux-control/
+.claude-log/
+.claude-tools/
+.claude/spec_hashes.json
+claude-workflow-bundle.zip
+__pycache__/
+*.pyc

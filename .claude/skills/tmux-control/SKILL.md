@@ -1,0 +1,84 @@
+---
+name: tmux-control
+description: Run shell work through visible persistent tmux sessions. Use when Codex needs to run benchmarks, tests, installs, builds, migrations, long-running jobs, nested Claude/agent sessions, interactive debuggers, commands requiring live observation/interruption, or any command involving sudo, credentials, passwords, or root-terminal prompts.
+---
+
+# Tmux Control
+
+Use tmux whenever opaque one-shot shell execution would hide progress, prompts, or failures from the user.
+
+## Core Rules
+
+- Run benchmark, test, install, build, clone, migration, server, watcher, debugger, and nested-agent commands in tmux.
+- Keep direct shell only for quick read-only inspection such as `pwd`, `ls`, `rg`, `sed`, `cat`, `find`, `head`, `tail`, `wc`, `stat`, `file`, and `git status`.
+- Never run `sudo` in an opaque shell. Redirect it to the root-request workflow, then ask the user to run the command or approve a visible root tmux terminal.
+- Always report the attach command, pane roles, and durable log/capture location.
+- Leave long-running sessions alive unless the user asks for cleanup.
+
+## Start Or Reuse A Session
+
+Use the bundled helper:
+
+```bash
+.claude/skills/tmux-control/scripts/tmux_control.sh start --session <name> --root "$PWD" --roles run,logs --replace
+.claude/skills/tmux-control/scripts/tmux_control.sh send --target <name>::run --command '<command>'
+.claude/skills/tmux-control/scripts/tmux_control.sh capture --target <name>::run --lines 200
+```
+
+Read [references/commands.md](references/commands.md) for command examples.
+
+## Pane Roles
+
+Use role names that make the workflow obvious:
+
+- `bench`: setup, checkout, tests, benchmark commands
+- `agent`: nested Claude or implementation agent session
+- `logs`: tail of durable log files
+- `run`: reproducer or application process
+- `debug`: debugger/REPL
+- `server`: long-running service
+- `client`: probes or test client
+
+## Sudo Policy
+
+If a command requires privilege, redirect it before running it in the normal Bash tool. Offer exactly one of these paths:
+
+- Ask the user to run the command and paste output.
+- Ask the user to approve a scoped root tmux session/pane.
+
+If a privilege boundary appears after trying a non-sudo command, disclose it before proceeding. Use a lesser-privilege source only when it is a true equivalent for the current request and will not become a brittle foundation for later work. If the workaround is partial, temporary, non-portable, or changes the intended environment, stop and request the sudo/root-tmux path.
+
+Generate root-terminal wording with:
+
+```bash
+.claude/skills/tmux-control/scripts/tmux_control.sh root-request --session root-<task> --cwd "$PWD" --command '<sudo-command>'
+```
+
+Read [references/sudo.md](references/sudo.md) before designing a privileged workflow.
+
+## Logging
+
+For each tmux workflow, preserve:
+
+- session name
+- pane aliases
+- attach command
+- command transcript or log path
+- initial failure output
+- final verification output
+
+Use `.tmux-control/captures/` for durable captures.
+
+## Failure Recovery
+
+If a command appears stuck:
+
+1. Capture the pane.
+2. Identify whether it is waiting for input, still running, or dead.
+3. If waiting for sudo/password input, stop and ask the user or switch to approved root tmux.
+4. If the process should be interrupted, use the tmux interrupt command.
+5. Capture output again after interruption.
+
+## Validation
+
+When changing this skill, read [references/validation.md](references/validation.md).
