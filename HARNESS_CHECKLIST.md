@@ -31,6 +31,7 @@ Set up a Claude Code workspace/harness that preserves useful behavior from the o
 - `CLAUDE.md`: concise always-loaded project guidance. Context, not enforcement.
 - `.claude/settings.json`: permissions and hook registration.
 - `.claude/hooks/`: deterministic guardrails.
+- `.claude/policy/`: current lean runtime rules and operating specification, adapted from the original bundle.
 - `.claude/skills/`: standalone project skills plus project-scope plugin directories loaded on demand.
 - Runtime logs and failed benchmark state are not part of the portable environment.
 
@@ -48,7 +49,7 @@ Set up a Claude Code workspace/harness that preserves useful behavior from the o
 - [x] Distill `andrej-karpathy-skills` into root `CLAUDE.md` and remove duplicate standalone `karpathy-guidelines` skill.
 - [x] Uninstall user-scope `dx@ykdojo` marketplace plugin and copy local `claude-code-tips` clone as full project-scope plugin `.claude/skills/dx/`.
 - [ ] Decide whether to also keep `.claude/CLAUDE.md` or use only root `CLAUDE.md`.
-- [ ] Decide whether to restore `.claude/policy/` as reference docs, distilled docs, or not at all.
+- [x] Restore `.claude/policy/` as current distilled policy docs, not legacy runtime scaffolding.
 - [ ] Decide whether to re-enable hash-drift protection from the original bundle.
 - [x] Keep an adapted `.claude-workflow/update_spec_hashes.sh` available for the current lean workspace shape.
 - [ ] Decide whether any `.claude-log` style memory is worth keeping.
@@ -58,14 +59,14 @@ Set up a Claude Code workspace/harness that preserves useful behavior from the o
 
 Original files still available under `/home/vsangli/agent_test/.claude/`.
 
-- [ ] Repo boundary rules.
-- [ ] `.claude/**` ownership and maintainer-mode rules.
-- [ ] External monkey patch / `site-packages` policy.
-- [ ] One-shot patch then investigation mode.
-- [ ] Verification loop and success criteria.
-- [ ] Environment contract from original `ENV.md`.
-- [ ] Tmux/visible execution policy.
-- [ ] Sudo/root terminal policy.
+- [x] Repo boundary rules.
+- [x] `.claude/**` ownership and maintainer-mode rules.
+- [x] External monkey patch / `site-packages` policy.
+- [x] One-shot patch then investigation mode.
+- [x] Verification loop and success criteria.
+- [x] Environment contract from original `ENV.md`.
+- [x] Tmux/visible execution policy.
+- [x] Sudo/root terminal policy.
 - [ ] Subagent primary-model policy.
 - [ ] Handoff/reset behavior.
 
@@ -121,6 +122,7 @@ Original files still available under `/home/vsangli/agent_test/.claude/`.
 - [x] Route direct Bash write/delete attempts away from opaque Bash and into `.claude/harness/run.sh`.
 - [x] Surface native Edit/Write/MultiEdit attempts on `.claude/**` as critical access-classifier prompts unless maintainer mode is explicitly enabled.
 - [x] Redirect direct `sudo` to root-request flow.
+- [x] Disallow in-session `! sudo` and user-run/paste-output sudo as suggested paths; privileged continuation must use an approved visible root tmux session.
 - [x] Inject guidance after Bash privilege/permission failures.
 - [x] Block direct long-running/test/install commands and point to tmux-control.
 - [x] Rewrite existing active harness scripts that use embedded Python into Bash-only implementations.
@@ -144,8 +146,11 @@ Original files still available under `/home/vsangli/agent_test/.claude/`.
 
 ## Environment Handling
 
-- [ ] Distill original `.claude/policy/ENV.md`.
-- [ ] Decide what belongs in `CLAUDE.md` vs `.claude/settings.json` `env` vs `.claude/settings.local.json`.
+- [x] Distill original `.claude/policy/ENV.md` into `.claude/ENV.md` plus a concise root `CLAUDE.md` reminder.
+- [x] Decide what belongs in `CLAUDE.md` vs `.claude/settings.json` `env` vs `.claude/settings.local.json`.
+  - Keep the environment contract in `.claude/ENV.md`.
+  - Keep always-loaded behavioral reminders in root `CLAUDE.md` and `session_start.sh`.
+  - Do not encode conda activation in `.claude/settings.json` `env`; activation is shell state, not simple environment variables.
 - [ ] Keep secrets and machine-specific paths local-only.
 
 ## Benchmark / Harness Issues
@@ -163,7 +168,7 @@ Original files still available under `/home/vsangli/agent_test/.claude/`.
 
 ## Known Complaints To Resolve
 
-- [ ] Direct sudo prompt can hang invisibly.
+- [x] Direct sudo prompt can hang invisibly.
 - [ ] Long-running commands need visible/persistent execution.
 - [ ] Need handoff/reset strategy.
 - [ ] Need subagent model policy.

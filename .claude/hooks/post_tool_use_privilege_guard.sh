@@ -50,8 +50,9 @@ Privilege boundary detected after Bash command:
 
 Apply the workspace privilege rule:
 - Say that the best direct execution appears to need elevated privileges.
+- Do not suggest in-session \`! sudo\` or direct opaque-shell sudo as a fallback.
 - Use a lesser-privilege path only if it is a true equivalent for this request and does not create a brittle foundation for later work.
-- If the workaround is partial, temporary, non-portable, or changes the intended environment, stop and request sudo/root-tmux before continuing.
+- If the workaround is partial, temporary, non-portable, or changes the intended environment, stop and request an approved visible root tmux session before continuing.
 - If you provide a no-root result, still mention the root path and why it was not required.
 
 Root-request helper:

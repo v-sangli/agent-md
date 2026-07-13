@@ -209,14 +209,14 @@ cmd_root_request() {
 
   cat <<EOF
 This command needs elevated privileges and may prompt for your password.
-I should not run it in an opaque shell.
+I should not run sudo in Claude's opaque shell or suggest in-session ! sudo.
 
-Option 1: please run this command and paste the output:
+Please approve a visible root tmux session named '$session' for this scoped task.
+The command to run inside that root tmux session is:
 
 $command
 
-Option 2: approve a visible root tmux session named '$session' for this scoped task.
-If approved, you can start it with:
+If approved, start the root tmux session from a real terminal with:
 
 sudo tmux new-session -As $(printf '%q' "$session") -c $(printf '%q' "$cwd")
 

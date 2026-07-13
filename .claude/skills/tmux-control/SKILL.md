@@ -11,7 +11,7 @@ Use tmux whenever opaque one-shot shell execution would hide progress, prompts, 
 
 - Run benchmark, test, install, build, clone, migration, server, watcher, debugger, and nested-agent commands in tmux.
 - Keep direct shell only for quick read-only inspection such as `pwd`, `ls`, `rg`, `sed`, `cat`, `find`, `head`, `tail`, `wc`, `stat`, `file`, and `git status`.
-- Never run `sudo` in an opaque shell. Redirect it to the root-request workflow, then ask the user to run the command or approve a visible root tmux terminal.
+- Never run `sudo` in an opaque shell, and never suggest in-session `! sudo`. Redirect privileged work to the root-request workflow for an approved visible root tmux terminal.
 - Always report the attach command, pane roles, and durable log/capture location.
 - Leave long-running sessions alive unless the user asks for cleanup.
 
@@ -41,12 +41,9 @@ Use role names that make the workflow obvious:
 
 ## Sudo Policy
 
-If a command requires privilege, redirect it before running it in the normal Bash tool. Offer exactly one of these paths:
+If a command requires privilege, redirect it before running it in the normal Bash tool. Offer exactly one path: ask the user to approve a scoped visible root tmux session/pane.
 
-- Ask the user to run the command and paste output.
-- Ask the user to approve a scoped root tmux session/pane.
-
-If a privilege boundary appears after trying a non-sudo command, disclose it before proceeding. Use a lesser-privilege source only when it is a true equivalent for the current request and will not become a brittle foundation for later work. If the workaround is partial, temporary, non-portable, or changes the intended environment, stop and request the sudo/root-tmux path.
+If a privilege boundary appears after trying a non-sudo command, disclose it before proceeding. Use a lesser-privilege source only when it is a true equivalent for the current request and will not become a brittle foundation for later work. If the workaround is partial, temporary, non-portable, or changes the intended environment, stop and request the approved visible root tmux path.
 
 Generate root-terminal wording with:
 
@@ -75,7 +72,7 @@ If a command appears stuck:
 
 1. Capture the pane.
 2. Identify whether it is waiting for input, still running, or dead.
-3. If waiting for sudo/password input, stop and ask the user or switch to approved root tmux.
+3. If waiting for sudo/password input, stop and switch to the approved root tmux request flow.
 4. If the process should be interrupted, use the tmux interrupt command.
 5. Capture output again after interruption.
 

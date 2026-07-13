@@ -30,7 +30,7 @@ if printf '%s\n' "$command_text" | grep -Eq '(^|[;&|()[:space:]])sudo([[:space:]
       sed "s/'/'\\\\''/g; 1s/^/'/; \$s/\$/'/"
   )"
   cat >&2 <<EOF
-Redirect: sudo in Claude Code's opaque Bash can hang at an unreachable password prompt. Use the visible root-terminal request flow instead:
+Redirect: sudo in Claude Code's opaque Bash or in-session ! commands can hang at an unreachable password prompt. Use the visible root-terminal request flow instead:
 .claude/skills/tmux-control/scripts/tmux_control.sh root-request --session root-$safe_name --cwd "\$PWD" --command $quoted_command
 EOF
   exit 2

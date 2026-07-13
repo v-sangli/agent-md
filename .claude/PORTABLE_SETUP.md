@@ -64,6 +64,7 @@ bash .claude/verify_setup.sh
 This checks:
 - required files exist
 - hooks are executable
+- current policy docs exist under `.claude/policy/`
 - `jq`, `rg`, and `realpath` are available
 - standalone project skills and vendored project-scope plugins are installed under `.claude/skills/`
 - `tmux-control` is installed in `.claude/skills/tmux-control/`
@@ -107,4 +108,6 @@ Inside Claude Code:
 ## Notes
 
 - `.claude` contains project settings, hooks, project skills, and vendored project-scope plugins.
+- `.claude/policy/` contains the current lean runtime rules and operating specification. It intentionally does not restore the old `.claude-log`, `.claude-tools`, or hash-drift runtime.
+- `.claude/ENV.md` contains the default Python environment contract. On a new machine, either create the named `dexpolicy` conda environment or update that file and `CLAUDE.md` together.
 - `.claude-log` and `.claude-tools` are intentionally not part of this lean setup.

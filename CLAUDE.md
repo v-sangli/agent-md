@@ -2,17 +2,32 @@
 
 This repository is a Claude Code workspace/harness under active design. Before changing structure, check `HARNESS_CHECKLIST.md` and update it with the decision being made.
 
+Policy references:
+- `.claude/policy/AGENT_RULES.md`: concise runtime contract.
+- `.claude/policy/OPERATING_SPEC.md`: full current operating specification.
+- `.claude/ENV.md`: environment contract.
+
 ## Working rules
 
 - Think before coding: state assumptions, surface ambiguity, and push back when the requested path seems overcomplicated.
 - Keep changes surgical. Every changed line should trace to the current request.
 - Define success criteria and verify them.
 - Use `.claude/skills/tmux-control/` for long-running, interactive, test, install, build, benchmark, nested-agent, or sudo-adjacent shell workflows.
-- Redirect direct `sudo` to the tmux-control root-request flow. Do not run `sudo` in an opaque shell.
+- Redirect direct `sudo` to the tmux-control root-request flow. Do not run `sudo` in an opaque shell, and do not suggest in-session `! sudo` as an alternative.
+- For privileged work, the only supported continuation path is an explicitly approved visible root tmux session scoped to the task.
 - When a command hits a privilege boundary, say so explicitly. A lesser-privilege path is acceptable only when it is a true equivalent for the request and does not create a brittle foundation for later work.
 - If the workaround is partial, temporary, non-portable, or changes the intended environment, stop and request the sudo/root-tmux path before continuing. Cheap read-only context may be shared while asking for root access.
 - Keep direct Bash for short read-only inspection only. Write/delete shell commands must run through `.claude/harness/run.sh -- '<command>'`; use tmux-control for long-running, test, install, build, benchmark, nested-agent, or sudo-adjacent work.
-- Do not reintroduce `.claude-log/`, `.claude-tools/`, or `.claude/policy/` without recording the reason in `HARNESS_CHECKLIST.md`.
+- Do not reintroduce `.claude-log/` or `.claude-tools/` without recording the reason in `HARNESS_CHECKLIST.md`.
+
+## Environment contract
+
+Read `.claude/ENV.md` before Python, pytest, uv, dependency, install, or build work.
+
+- Default Python environment: `source ~/miniconda3/bin/activate dexpolicy`.
+- Validate with `python -V` and `which python` before building on the environment.
+- If activation fails or dependencies are missing, stop and ask before switching environments, installing globally, modifying system Python, or relying on durable workarounds.
+- Do not use `PYTHONPATH=.` as a durable fix. It is acceptable only as an explicitly named temporary diagnostic.
 
 ## Karpathy guidelines
 

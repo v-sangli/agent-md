@@ -98,6 +98,9 @@ need_command rg
 need_command realpath
 
 need_file ".claude/access.conf"
+need_file ".claude/ENV.md"
+need_file ".claude/policy/AGENT_RULES.md"
+need_file ".claude/policy/OPERATING_SPEC.md"
 need_file ".claude/settings.json"
 need_file ".claude/harness/run.sh"
 need_file ".claude/hooks/access_guard.sh"
@@ -123,7 +126,6 @@ need_file ".claude/skills/superpowers/skills/brainstorming/SKILL.md"
 
 need_absent ".claude-log"
 need_absent ".claude-tools"
-need_absent ".claude/policy"
 need_absent ".claude/spec_hashes.json"
 need_absent "reference"
 need_absent ".claude/skills/clone"
@@ -219,6 +221,55 @@ else
   fail "CLAUDE.md contains distilled Karpathy guidance"
 fi
 
+env_ok=1
+for required in \
+  "source ~/miniconda3/bin/activate dexpolicy" \
+  "python -V" \
+  "which python" \
+  "PYTHONPATH=."; do
+  rg -Fq "$required" "$REPO_DIR/.claude/ENV.md" || env_ok=0
+done
+for required in \
+  'Read `.claude/ENV.md`' \
+  "source ~/miniconda3/bin/activate dexpolicy" \
+  "PYTHONPATH=."; do
+  rg -Fq "$required" "$REPO_DIR/CLAUDE.md" || env_ok=0
+done
+if [ "$env_ok" -eq 1 ]; then
+  pass "environment contract is restored and referenced"
+else
+  fail "environment contract is restored and referenced"
+fi
+
+policy_ok=1
+for required in \
+  "## Non-Negotiables" \
+  ".claude/harness/run.sh" \
+  "tmux-control" \
+  ".claude/ENV.md" \
+  "PYTHONPATH=."; do
+  rg -Fq "$required" "$REPO_DIR/.claude/policy/AGENT_RULES.md" || policy_ok=0
+done
+for required in \
+  "Version: 2.0" \
+  ".claude/harness/run.sh" \
+  ".claude/access.conf" \
+  "tmux-control" \
+  ".claude/ENV.md" \
+  "Policy hash drift blocking is not active"; do
+  rg -Fq "$required" "$REPO_DIR/.claude/policy/OPERATING_SPEC.md" || policy_ok=0
+done
+if rg -Fq ".claude-log" "$REPO_DIR/.claude/policy/AGENT_RULES.md" "$REPO_DIR/.claude/policy/OPERATING_SPEC.md" ||
+  rg -Fq ".claude-tools" "$REPO_DIR/.claude/policy/AGENT_RULES.md" "$REPO_DIR/.claude/policy/OPERATING_SPEC.md" ||
+  rg -Fq "spec_hashes.json" "$REPO_DIR/.claude/policy/AGENT_RULES.md" "$REPO_DIR/.claude/policy/OPERATING_SPEC.md"; then
+  policy_ok=0
+fi
+if [ "$policy_ok" -eq 1 ]; then
+  pass "policy docs are restored for the lean harness"
+else
+  fail "policy docs are restored for the lean harness"
+fi
+
 ss_out="$(printf '{"session_id":"verify"}' | CLAUDE_PROJECT_DIR="$REPO_DIR" bash "$REPO_DIR/.claude/hooks/session_start.sh")"
 for key in "STATE REINJECTION" "SESSION_ID:" "RULE SNAPSHOT:"; do
   if printf '%s\n' "$ss_out" | rg -q "$key"; then
@@ -296,8 +347,8 @@ run_expect "pre_tool_use_bash_guard redirects sudo" 2 bash -lc "set +e; printf '
 run_expect "pre_tool_use_bash_guard blocks direct pytest" 2 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"pytest -q\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'"
 run_expect "pre_tool_use_bash_guard allows tmux-control helper" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\".claude/skills/tmux-control/scripts/tmux_control.sh send --target smoke::run --command '\\''pytest -q'\\''\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'"
 run_expect "pre_tool_use_bash_guard allows root-request with sudo argument" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\".claude/skills/tmux-control/scripts/tmux_control.sh root-request --session root-verify --cwd . --command '\\''sudo true'\\''\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'"
-run_expect "tmux-control root request does not run sudo" 0 bash -lc "cd '$REPO_DIR' && .claude/skills/tmux-control/scripts/tmux_control.sh root-request --session root-verify --cwd '$REPO_DIR' --command 'sudo true' | rg -q 'approve a visible root tmux session'"
-run_expect "post_tool_use_privilege_guard injects root guidance" 0 bash -lc "printf '{\"hook_event_name\":\"PostToolUseFailure\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"dmesg | tail\"},\"error\":\"dmesg: read kernel buffer failed: Operation not permitted\"}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/post_tool_use_privilege_guard.sh' >/tmp/verify_privilege_hook.out && jq -e . /tmp/verify_privilege_hook.out >/dev/null && rg -q 'root-request' /tmp/verify_privilege_hook.out && rg -q 'true equivalent' /tmp/verify_privilege_hook.out"
+run_expect "tmux-control root request only offers root tmux" 0 bash -lc "cd '$REPO_DIR' && .claude/skills/tmux-control/scripts/tmux_control.sh root-request --session root-verify --cwd '$REPO_DIR' --command 'sudo true' >/tmp/verify_root_request.out && rg -q 'approve a visible root tmux session' /tmp/verify_root_request.out && rg -q 'real terminal' /tmp/verify_root_request.out && ! rg -q 'Option 1|paste the output|in-session ! sudo.*alternative' /tmp/verify_root_request.out"
+run_expect "post_tool_use_privilege_guard injects root guidance" 0 bash -lc "printf '{\"hook_event_name\":\"PostToolUseFailure\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"dmesg | tail\"},\"error\":\"dmesg: read kernel buffer failed: Operation not permitted\"}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/post_tool_use_privilege_guard.sh' >/tmp/verify_privilege_hook.out && jq -e . /tmp/verify_privilege_hook.out >/dev/null && rg -q 'root-request' /tmp/verify_privilege_hook.out && rg -q 'true equivalent' /tmp/verify_privilege_hook.out && rg -q 'Do not suggest in-session' /tmp/verify_privilege_hook.out"
 
 printf '\nSUMMARY | PASS=%d FAIL=%d\n' "$pass_count" "$fail_count"
 if [ "$fail_count" -ne 0 ]; then

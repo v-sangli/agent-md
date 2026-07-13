@@ -26,13 +26,13 @@ Check the sudo request path:
 .claude/skills/tmux-control/scripts/tmux_control.sh root-request --session root-smoke --cwd "$PWD" --command 'sudo true'
 ```
 
-The output must ask the user to run or approve a visible root tmux session. It must not execute `sudo`.
+The output must ask the user to approve a visible root tmux session. It must not suggest in-session `! sudo`, ask for paste-output execution, or execute `sudo`.
 
 ## Hook Behavior
 
 The project verifier should prove:
 
-- Direct `sudo` in opaque Bash is blocked with user-run or root-tmux guidance.
+- Direct `sudo` in opaque Bash is blocked with root-tmux guidance only.
 - Permission/privilege failures after Bash inject guidance to disclose the boundary and request root when no true equivalent exists.
 - Direct tests, installs, benchmarks, and nested-agent commands are blocked or redirected to tmux.
 - The same commands are allowed when sent through `.claude/skills/tmux-control/scripts/tmux_control.sh`.
