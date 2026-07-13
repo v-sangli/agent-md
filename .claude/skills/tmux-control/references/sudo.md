@@ -1,5 +1,8 @@
 # Sudo And Root Terminal Policy
 
+This reference expands `.claude/policy/AGENT_RULES.md` for privileged tmux
+workflows. If wording drifts, `AGENT_RULES.md` is the canonical source.
+
 ## Problem
 
 Claude-style opaque shell execution can approve a `sudo` command but still leave the password prompt unreachable. The result is a stuck command and a frustrated user who must replay the command manually.

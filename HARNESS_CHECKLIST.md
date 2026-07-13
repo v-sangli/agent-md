@@ -38,6 +38,7 @@ Set up a Claude Code workspace/harness that preserves useful behavior from the o
 ## Decisions
 
 - [x] Keep project `CLAUDE.md` at repo root for now.
+- [x] Use concise-vs-elaborate rule layering: `AGENT_RULES.md` is canonical, `OPERATING_SPEC.md` explains, `CLAUDE.md`/session-start point to sources, and domain files carry mechanics.
 - [x] Keep `tmux-control` as a project skill under `.claude/skills/tmux-control/`.
 - [x] Use a shell helper for tmux-control, not a Python subprocess wrapper.
 - [x] Harness scripts are Bash-only. Do not add Python or embedded Python to `.claude/hooks/`, `.claude-workflow/`, verifier scripts, or other harness enforcement scripts.
@@ -139,7 +140,7 @@ Original files still available under `/home/vsangli/agent_test/.claude/`.
   - Treat external writes and deletes separately so one grant does not imply the other.
   - Treat dangerous roots such as `/`, `$HOME`, `/etc`, `/usr`, `/var`, and `/boot` as critical.
 - [x] Claude Code native Edit/Write/MultiEdit cannot be script-executed by a runner; hooks can only classify and prompt/block those native tools.
-- [ ] Decide whether direct `pytest` should be blocked, ask-mode, or allowed for short tests.
+- [x] Route direct `pytest`/test/build/install commands through `tmux-control` for now; revisit later if short direct tests should be allowed.
 - [x] Use structured JSON permission decisions for access-guard `allow`/`ask` and critical prompts; keep exit-code blocks for direct sudo and tmux-required commands.
 - [ ] Add tests for quoted `sudo` inside root-request command.
 - [ ] Add tests for shell edge cases: `env sudo`, `command sudo`, `doas`, `su -c`.
@@ -173,7 +174,7 @@ Original files still available under `/home/vsangli/agent_test/.claude/`.
 - [ ] Need handoff/reset strategy.
 - [ ] Need subagent model policy.
 - [ ] Need skill installation/update story.
-- [ ] Need concise `CLAUDE.md` that retains important original policy without bloat.
+- [x] Need concise `CLAUDE.md` that retains important original policy without bloat.
 - [ ] Need clear portable setup.
 - [ ] Need repeatable verifier.
 - [x] Existing active harness scripts no longer contain embedded Python.

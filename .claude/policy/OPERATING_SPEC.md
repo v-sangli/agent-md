@@ -1,171 +1,138 @@
 # Claude Operating Specification
 
-Version: 2.0
+Version: 2.1
 Scope: Current lean Claude Code workspace/harness in this repository.
 
-This specification replaces the original policy bundle that depended on
-persistent agent memory files, separate debug helper scaffolding, and contract
-hash blocking. Those systems are intentionally not active in this workspace.
+`AGENT_RULES.md` is the canonical rule source. This file explains how the
+workspace is structured, why the rules exist, and how to verify the setup. If a
+short rule and this document drift, update both deliberately instead of treating
+this file as an additional rule layer.
 
-## 1. Purpose
-
-This document defines:
-
-1. What Claude may change.
-2. How shell mutation, sudo, and long-running work must be routed.
-3. How environment assumptions are handled.
-4. How debugging, refactoring, and validation should proceed.
-5. What counts as a correct portable harness setup.
-
-Normative keywords:
-
-- MUST: mandatory.
-- MUST NOT: forbidden.
-- SHOULD: default unless explicitly overridden by the user.
-- MAY: acceptable when appropriate.
-
-## 2. Current Workspace Model
-
-The active workspace shape is:
+## 1. File Roles
 
 ```text
-repo/
-  CLAUDE.md
-  HARNESS_CHECKLIST.md
-  .claude/
-    ENV.md
-    PORTABLE_SETUP.md
-    access.conf
-    settings.json
-    settings.local.json
-    harness/
-      run.sh
-    hooks/
-      access_guard.sh
-      pre_tool_use_bash_guard.sh
-      pre_tool_use_guard.sh
-      post_tool_use_privilege_guard.sh
-      session_start.sh
-    policy/
-      AGENT_RULES.md
-      OPERATING_SPEC.md
-    skills/
-      tmux-control/
-      dx/
-      superpowers/
-    verify_setup.sh
-  .claude-workflow/
+CLAUDE.md                         always-loaded orientation and style
+.claude/policy/AGENT_RULES.md     concise canonical runtime contract
+.claude/policy/OPERATING_SPEC.md  rationale, design notes, acceptance criteria
+.claude/ENV.md                    environment identity and activation commands
+.claude/settings.json             Claude Code hook/permission registration
+.claude/hooks/                    enforcement and redirect messages
+.claude/harness/run.sh            shell write/delete executor
+.claude/access.conf               local access grants
+.claude/skills/tmux-control/      visible shell/root workflow helper
+.claude/skills/dx/                vendored Claude Code Tips plugin
+.claude/skills/superpowers/       vendored Superpowers plugin
 ```
 
-Runtime logs, old benchmark state, and generated control captures are not part
-of the portable contract.
+Policy hash drift blocking is not active unless explicitly reintroduced and
+documented in `HARNESS_CHECKLIST.md`.
 
-## 3. Root Of Trust
+## 2. Access Model
 
-- REQ-001: `CLAUDE.md` MUST remain the concise always-loaded project memory.
-- REQ-002: `.claude/policy/AGENT_RULES.md` MUST remain the concise runtime rule summary.
-- REQ-003: `.claude/policy/OPERATING_SPEC.md` MUST remain the fuller operating specification.
-- REQ-004: `.claude/ENV.md` MUST remain the canonical environment contract.
-- REQ-005: `.claude/settings.json`, `.claude/hooks/**`, `.claude/harness/**`, `.claude/access.conf`, and `.claude/skills/**` define active enforcement and workflow behavior.
-- REQ-006: Policy hash drift blocking is not active unless explicitly reintroduced and documented in `HARNESS_CHECKLIST.md`.
+Normal repository files are the default working area. `.claude/**` is protected
+configuration, but can be edited during explicit harness maintenance like this
+current setup work.
 
-## 4. Ownership Boundaries
+The active access path is:
 
-- REQ-007: Claude MAY edit normal repository files under the workspace root.
-- REQ-008: Claude MUST NOT edit files outside the workspace root unless the user explicitly requests or approves that scope.
-- REQ-009: `.claude/**` MUST be treated as protected configuration during ordinary task work.
-- REQ-010: Claude MAY edit `.claude/**` during explicit harness/Claude-setup maintenance requested by the user.
-- REQ-011: Protected `.claude/**` mutation through shell commands SHOULD use `.claude/access.conf` `maintainer_mode=true` or equivalent explicit user approval.
-- REQ-012: `.git/**`, filesystem roots, home directory roots, and system paths such as `/etc`, `/usr`, `/var`, `/boot`, `/dev`, `/proc`, and `/sys` MUST be treated as critical write/delete targets.
+1. Claude attempts a Bash write/delete.
+2. `.claude/hooks/pre_tool_use_bash_guard.sh` blocks direct mutation and points
+   to `.claude/harness/run.sh`.
+3. `.claude/harness/run.sh` asks `.claude/hooks/access_guard.sh` to classify
+   every target.
+4. Workspace and safe `/tmp` content writes/deletes run; external targets ask;
+   critical targets do not run.
+5. `.claude/access.conf` can grant external write/delete roots or protected
+   `.claude/**` maintainer mode.
 
-## 5. Shell Execution Policy
+Native `Edit`, `Write`, and `MultiEdit` tools cannot be script-executed by the
+harness, so hooks classify and prompt/block them directly.
 
-- REQ-013: Direct Bash SHOULD be limited to short read-only inspection.
-- REQ-014: Shell writes/deletes MUST run through `.claude/harness/run.sh -- '<command>'`.
-- REQ-015: The harness MAY execute workspace-scoped writes/deletes and safe `/tmp` content cleanup.
-- REQ-016: The harness MUST stop and ask for non-critical external writes/deletes unless `.claude/access.conf` grants the exact access class and optional root scope.
-- REQ-017: The harness MUST stop without running critical writes/deletes.
-- REQ-018: Direct tests, installs, builds, benchmarks, interpreters, nested agents, servers, watchers, and long-running commands MUST be routed through `tmux-control`.
-- REQ-019: Shell commands with dynamic or unresolved write/delete targets SHOULD stop and ask instead of guessing.
+## 3. Shell And Tmux Routing
 
-## 6. Sudo And Privilege Policy
+Direct Bash is kept for short read-only inspection because it is fast and easy
+to audit. Anything with progress, prompts, credentials, installation, tests, or
+long runtime moves to `tmux-control`, where the user can attach and observe.
 
-- REQ-020: Claude MUST NOT run `sudo` in opaque Bash.
-- REQ-021: Claude MUST NOT suggest in-session `! sudo`, `sudo -S`, password piping, askpass hacks, or similar password workarounds.
-- REQ-022: Privileged continuation MUST use the `tmux-control` root-request flow and an explicitly approved visible root tmux session.
-- REQ-023: When the best direct execution needs privilege, Claude MUST say so even if a lesser-privilege result is also available.
-- REQ-024: A lesser-privilege path MAY be used only when it is a true equivalent for the user request and does not create a brittle foundation for later work.
-- REQ-025: If the no-root path is partial, temporary, non-portable, changes the intended environment, or weakens the task, Claude MUST stop and request the approved root tmux path.
+This is intentionally a routing rule, not a claim that every test is dangerous.
+The current harness chooses transparency over convenience for direct test/build
+commands. Revisit this in `HARNESS_CHECKLIST.md` if short direct tests should be
+allowed later.
 
-## 7. Environment Policy
+## 4. Privilege Boundary
 
-- REQ-026: Environment assumptions MUST be sourced from `.claude/ENV.md`.
-- REQ-027: Python, pytest, uv, dependency, install, and build work SHOULD use the `dexpolicy` conda environment unless the user explicitly overrides it.
-- REQ-028: Claude SHOULD validate the active Python with `python -V` and `which python` before building on the environment.
-- REQ-029: If activation fails or dependencies are missing, Claude MUST stop and ask before switching environments, installing globally, or modifying system Python.
-- REQ-030: `PYTHONPATH=.` MUST NOT be used as a durable fix. It MAY be used only as an explicitly named temporary diagnostic.
+The sudo/root rule exists because Claude Code's opaque shell cannot reliably
+surface password prompts. The desired behavior is:
 
-## 8. External Monkey Patch Policy
+1. disclose that elevated privilege appears to be the direct path;
+2. provide any cheap no-root information that is genuinely equivalent or useful;
+3. avoid building on a partial workaround;
+4. request a visible root tmux session through `tmux-control` when privilege is
+   necessary.
 
-- REQ-031: Direct edits to `site-packages`, system paths, external dependency checkouts, or other paths outside the repo are prohibited by default.
-- REQ-032: If external patching appears necessary, Claude MUST stop and ask for explicit user approval.
-- REQ-033: Claude SHOULD prefer in-repo fixes, dependency pins/upgrades, wrappers, or vendored patches over external monkey patches.
+The hook and skill messages are operational copies of this route. They should
+stay short and should point back to the canonical rule when possible.
 
-## 9. Debugging And Change Discipline
+## 5. Environment Boundary
 
-- REQ-034: For a new bug, Claude MAY try one minimal hypothesis-driven patch.
-- REQ-035: If a similar failure repeats, Claude MUST stop patching and switch to investigation before further fixes.
-- REQ-036: Investigation SHOULD gather targeted evidence, name the active hypothesis, and verify the hypothesis before changing more code.
-- REQ-037: Claude SHOULD prefer line-tagged diagnostics and focused repros over broad exploratory churn.
-- REQ-038: Claude MUST keep changes surgical and traceable to the user request.
-- REQ-039: Claude SHOULD extend existing modules/helpers before creating parallel replacements.
-- REQ-040: Subsystem-level refactors MUST be proposed first and require user approval.
-- REQ-041: Non-trivial refactor work SHOULD use a git worktree.
+`.claude/ENV.md` identifies the default conda environment and validation
+commands. Behavioral constraints such as avoiding durable `PYTHONPATH=.`
+workarounds live in `AGENT_RULES.md` so environment details do not become a
+second policy file.
 
-## 10. Validation Policy
+Conda activation is shell state, so it is not encoded in `.claude/settings.json`
+`env`.
 
-- REQ-042: Claude MUST define success criteria before substantial edits.
-- REQ-043: Claude MUST run meaningful validation after meaningful edits when feasible.
-- REQ-044: For harness changes, `bash .claude/verify_setup.sh` is the baseline offline verifier.
-- REQ-045: Test, build, install, benchmark, and long-running validation SHOULD run through `tmux-control`.
-- REQ-046: If validation cannot be run, Claude MUST say why and describe residual risk.
+## 6. Change Discipline
 
-## 11. Skills And Plugins
+The harness keeps the useful parts of the original operating spec:
 
-- REQ-047: `.claude/skills/tmux-control/` is the project skill for visible persistent shell work.
-- REQ-048: `.claude/skills/dx/` and `.claude/skills/superpowers/` are vendored project-scope plugin directories.
-- REQ-049: Third-party skills/plugins SHOULD be copied as complete project-scope plugin directories when their repo-level glue files matter.
-- REQ-050: Modified third-party skills/plugins SHOULD either be tracked in this repo intentionally or moved to a forked upstream; do not silently flatten or partially copy plugin repos.
+- one minimal patch before investigation mode;
+- no unapproved external monkey patches;
+- prefer existing modules/helpers over parallel systems;
+- propose subsystem refactors first;
+- define success criteria and run meaningful validation.
 
-## 12. Offline And Portability Contract
+These are judgment rules. They should guide behavior without turning every task
+into ceremony.
 
-- REQ-051: Core harness verification MUST work offline.
-- REQ-052: Web access and external marketplace plugins are optional accelerators, not hard dependencies.
-- REQ-053: `.claude/PORTABLE_SETUP.md` MUST describe how to bundle, install, chmod, and verify the workspace setup.
-- REQ-054: `.claude-workflow/bundle_claude_dirs.sh` SHOULD package `CLAUDE.md`, `.claude/`, and `.claude-workflow/`.
-- REQ-055: Generated runtime state such as `.tmux-control/` MUST remain out of versioned portable setup unless explicitly requested.
+## 7. Skills And Plugins
 
-## 13. Acceptance Criteria
+`tmux-control` is a standalone project skill because it is part of this harness.
+`dx` and `superpowers` are copied as complete project-scope plugin directories
+because their repo-level glue files matter. Avoid flattening third-party plugin
+repos unless the loss of their root metadata is intentional and documented.
+
+## 8. Portability
+
+`.claude/PORTABLE_SETUP.md` describes bundle/install/chmod/verify steps.
+`.claude-workflow/bundle_claude_dirs.sh` should package `CLAUDE.md`, `.claude/`,
+and `.claude-workflow/`. Generated runtime state stays out of the portable
+bundle unless explicitly requested.
+
+## 9. Acceptance Criteria
 
 Setup is considered correct when all are true:
 
 1. `bash .claude/verify_setup.sh` passes.
-2. Root `CLAUDE.md` points to the current policy and environment docs.
-3. `.claude/policy/AGENT_RULES.md` and `.claude/policy/OPERATING_SPEC.md` describe the current lean harness, not the removed runtime systems.
-4. Direct Bash writes/deletes are blocked and routed to `.claude/harness/run.sh`.
-5. Workspace writes/deletes and safe `/tmp` content cleanup execute only through the harness.
-6. External writes/deletes ask unless explicitly granted in `.claude/access.conf`.
+2. `CLAUDE.md` points to the policy and environment sources instead of
+   restating every hard rule.
+3. `AGENT_RULES.md` is the only concise canonical runtime contract.
+4. `OPERATING_SPEC.md` explains design/rationale without becoming a second
+   stronger rule layer.
+5. Direct Bash writes/deletes route to `.claude/harness/run.sh`.
+6. External writes/deletes ask unless granted in `.claude/access.conf`.
 7. Critical destructive requests stop without running.
-8. Direct sudo and in-session sudo suggestions are redirected to the root tmux request flow.
-9. Direct tests/installs/builds/benchmarks are routed to `tmux-control`.
-10. Environment behavior points to `.claude/ENV.md` and rejects durable `PYTHONPATH=.` workarounds.
+8. Direct sudo and in-session sudo suggestions route to root tmux request flow.
+9. Direct tests/installs/builds/benchmarks route to `tmux-control`.
+10. Environment details live in `.claude/ENV.md`.
 
-## 14. Maintenance Procedure
+## 10. Maintenance Procedure
 
 When updating this harness intentionally:
 
 1. Update `HARNESS_CHECKLIST.md` with the decision being made.
-2. Edit the smallest set of `.claude/**` and root docs needed for the change.
-3. Keep active scripts Bash-only.
+2. Keep active scripts Bash-only.
+3. Prefer editing the canonical source over repeating a rule in more files.
 4. Run `bash .claude/verify_setup.sh`.
 5. Review `git diff` before committing.

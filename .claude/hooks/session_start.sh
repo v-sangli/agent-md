@@ -14,11 +14,12 @@ cat <<EOF
 STATE REINJECTION
 SESSION_ID: $session_id
 
-RULE SNAPSHOT:
-- Policy docs: .claude/policy/AGENT_RULES.md, .claude/policy/OPERATING_SPEC.md, and .claude/ENV.md.
-- Use the tmux-control skill for long-running, interactive, test, install, build, benchmark, or nested-agent shell work.
-- Do not run sudo in an opaque shell, and do not suggest in-session ! sudo. Request an explicitly approved visible root tmux session.
-- If a command hits a privilege boundary, disclose it. Use lesser privileges only for true equivalents; stop for root access when the workaround is partial, temporary, or non-portable.
-- Read .claude/ENV.md before Python/pytest/uv/dependency work. Use the dexpolicy conda environment by default; do not use PYTHONPATH=. as a durable fix.
-- Normal task agents must not edit .claude/** unless the user is intentionally maintaining this Claude setup.
+RULE SOURCES:
+- .claude/policy/AGENT_RULES.md is the canonical short runtime contract.
+- .claude/policy/OPERATING_SPEC.md explains design rationale and acceptance criteria.
+- .claude/ENV.md identifies the default Python environment.
+
+POINTERS:
+- Use tmux-control when work needs visible shell execution.
+- Use bash .claude/verify_setup.sh after harness changes.
 EOF

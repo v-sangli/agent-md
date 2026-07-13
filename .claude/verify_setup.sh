@@ -226,13 +226,13 @@ for required in \
   "source ~/miniconda3/bin/activate dexpolicy" \
   "python -V" \
   "which python" \
-  "PYTHONPATH=."; do
+  ".claude/policy/AGENT_RULES.md"; do
   rg -Fq "$required" "$REPO_DIR/.claude/ENV.md" || env_ok=0
 done
 for required in \
-  'Read `.claude/ENV.md`' \
-  "source ~/miniconda3/bin/activate dexpolicy" \
-  "PYTHONPATH=."; do
+  "AGENT_RULES.md" \
+  "OPERATING_SPEC.md" \
+  ".claude/ENV.md"; do
   rg -Fq "$required" "$REPO_DIR/CLAUDE.md" || env_ok=0
 done
 if [ "$env_ok" -eq 1 ]; then
@@ -251,7 +251,8 @@ for required in \
   rg -Fq "$required" "$REPO_DIR/.claude/policy/AGENT_RULES.md" || policy_ok=0
 done
 for required in \
-  "Version: 2.0" \
+  "Version: 2.1" \
+  "canonical rule source" \
   ".claude/harness/run.sh" \
   ".claude/access.conf" \
   "tmux-control" \
@@ -271,7 +272,7 @@ else
 fi
 
 ss_out="$(printf '{"session_id":"verify"}' | CLAUDE_PROJECT_DIR="$REPO_DIR" bash "$REPO_DIR/.claude/hooks/session_start.sh")"
-for key in "STATE REINJECTION" "SESSION_ID:" "RULE SNAPSHOT:"; do
+for key in "STATE REINJECTION" "SESSION_ID:" "RULE SOURCES:" "POINTERS:"; do
   if printf '%s\n' "$ss_out" | rg -q "$key"; then
     pass "session_start output contains $key"
   else

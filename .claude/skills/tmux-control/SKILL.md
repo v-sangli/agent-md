@@ -11,8 +11,8 @@ Use tmux whenever opaque one-shot shell execution would hide progress, prompts, 
 
 - Run benchmark, test, install, build, clone, migration, server, watcher, debugger, and nested-agent commands in tmux.
 - Keep direct shell only for quick read-only inspection such as `pwd`, `ls`, `rg`, `sed`, `cat`, `find`, `head`, `tail`, `wc`, `stat`, `file`, and `git status`.
-- Never run `sudo` in an opaque shell, and never suggest in-session `! sudo`. Redirect privileged work to the root-request workflow for an approved visible root tmux terminal.
-- Always report the attach command, pane roles, and durable log/capture location.
+- For sudo/root behavior, follow `.claude/policy/AGENT_RULES.md` and [references/sudo.md](references/sudo.md).
+- Report the attach command, pane roles, and any durable capture location.
 - Leave long-running sessions alive unless the user asks for cleanup.
 
 ## Start Or Reuse A Session
@@ -41,11 +41,7 @@ Use role names that make the workflow obvious:
 
 ## Sudo Policy
 
-If a command requires privilege, redirect it before running it in the normal Bash tool. Offer exactly one path: ask the user to approve a scoped visible root tmux session/pane.
-
-If a privilege boundary appears after trying a non-sudo command, disclose it before proceeding. Use a lesser-privilege source only when it is a true equivalent for the current request and will not become a brittle foundation for later work. If the workaround is partial, temporary, non-portable, or changes the intended environment, stop and request the approved visible root tmux path.
-
-Generate root-terminal wording with:
+Generate root-terminal request wording with:
 
 ```bash
 .claude/skills/tmux-control/scripts/tmux_control.sh root-request --session root-<task> --cwd "$PWD" --command '<sudo-command>'
@@ -55,7 +51,7 @@ Read [references/sudo.md](references/sudo.md) before designing a privileged work
 
 ## Logging
 
-For each tmux workflow, preserve:
+For non-trivial tmux workflows, preserve:
 
 - session name
 - pane aliases
