@@ -418,7 +418,14 @@ run_expect "pre_tool_use_bash_guard keeps generic source opaque" 0 bash -lc "out
 run_expect "pre_tool_use_bash_guard falls through on unknown head" 0 bash -lc "out=\$(printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"sometool --flag arg\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'); [ -z \"\$out\" ]"
 run_expect "harness runner executes workspace rm-rf" 0 bash -lc "cd '$REPO_DIR' && rm -rf .verify-harness && mkdir -p .verify-harness/child && .claude/harness/run.sh -- 'rm -rf .verify-harness/child' && test ! -e .verify-harness/child && rm -rf .verify-harness"
 run_expect "harness runner executes safe /tmp cleanup" 0 bash -lc "mkdir -p /tmp/claude-harness-verify && '$REPO_DIR/.claude/harness/run.sh' -- 'rm -rf /tmp/claude-harness-verify' && test ! -e /tmp/claude-harness-verify"
-run_expect "harness runner asks for external delete without running" 3 bash -lc "cd '$REPO_DIR'; set +e; .claude/harness/run.sh -- 'rm -rf /opt/claude-harness-test' 2>/tmp/verify_harness_external.err; rc=\$?; set -e; rg -q 'Approval required' /tmp/verify_harness_external.err; exit \$rc"
+# run.sh reads the LIVE access.conf (it cannot be pointed at the hermetic
+# dir), so expect by the machine-local grant state: default-deny -> ask
+# without running (3); granted -> executes (0).
+if rg -q '^allow_external_delete=true' "$REPO_DIR/.claude/access.conf" 2>/dev/null; then
+  run_expect "harness runner executes external delete under live grant" 0 bash -lc "cd '$REPO_DIR'; .claude/harness/run.sh -- 'rm -rf /opt/claude-harness-test'"
+else
+  run_expect "harness runner asks for external delete without running" 3 bash -lc "cd '$REPO_DIR'; set +e; .claude/harness/run.sh -- 'rm -rf /opt/claude-harness-test' 2>/tmp/verify_harness_external.err; rc=\$?; set -e; rg -q 'Approval required' /tmp/verify_harness_external.err; exit \$rc"
+fi
 run_expect "harness runner treats critical delete as non-running request" 4 bash -lc "cd '$REPO_DIR'; set +e; .claude/harness/run.sh -- 'rm -rf /tmp' 2>/tmp/verify_harness_critical.err; rc=\$?; set -e; rg -q 'Critical approval required' /tmp/verify_harness_critical.err; exit \$rc"
 run_expect "harness runner asks for dynamic target without running" 3 bash -lc "cd '$REPO_DIR'; set +e; .claude/harness/run.sh -- 'rm -rf \"\$TARGET\"' 2>/tmp/verify_harness_dynamic.err; rc=\$?; set -e; rg -q 'dynamic|unresolved' /tmp/verify_harness_dynamic.err; exit \$rc"
 
@@ -501,6 +508,50 @@ if [ -x "$REPO_DIR/$SGH" ]; then
   # force threshold to 0 -> must nudge
   out2="$(printf '{"transcript_path":"%s","hook_event_name":"Stop"}' "$REPO_DIR/$FIX" | CTX_NUDGE_FRACTION=0 "$REPO_DIR/$SGH" 2>/dev/null || true)"
   printf '%s' "$out2" | grep -qi 'context' && pass "stop gauge nudges over threshold" || fail "stop gauge should nudge (got: $out2)"
+fi
+
+# --- context engine: ctxprune validate ---
+CTXP=".claude/context/ctxprune.sh"
+need_exec "$CTXP"
+if [ -x "$REPO_DIR/$CTXP" ]; then
+  run_expect "ctxprune validate clean fixture" 0 "$REPO_DIR/$CTXP" validate "$REPO_DIR/$FIX"
+  # remove only the tool_result line for tu2 (leaving its tool_use orphaned).
+  # NOTE: grep -v '"tu2"' would also delete the tool_use line (same substring),
+  # producing a still-valid file — filter on the tool_result-specific key instead.
+  broken="$(mktemp)"; grep -v '"tool_use_id":"tu2"' "$REPO_DIR/$FIX" > "$broken" || true
+  run_expect "ctxprune validate broken fixture rejects" 1 "$REPO_DIR/$CTXP" validate "$broken"
+  rm -f "$broken"
+fi
+
+# --- context engine: ctxprune prune ---
+if [ -x "$REPO_DIR/$CTXP" ]; then
+  out="$(mktemp)"
+  "$REPO_DIR/$CTXP" prune "$REPO_DIR/$FIX" "$out" 2>/dev/null || true
+  run_expect "pruned output validates" 0 "$REPO_DIR/$CTXP" validate "$out"
+  # capsules: only the last assistant turn (tu2's) retained -> 1 signature remains
+  sigs="$(jq -r '.message.content[]?|select(.type=="thinking")|.signature' "$out" 2>/dev/null | grep -c . || true)"
+  [ "$sigs" = "1" ] && pass "prune drops prior-turn capsules (1 left)" || fail "prune capsules (got $sigs want 1)"
+  # tu1 result stubbed
+  stub="$(jq -r 'select(.message.content!=null)|.message.content[]?|select(.type=="tool_result" and .tool_use_id=="tu1")|.content' "$out" 2>/dev/null || true)"
+  printf '%s' "$stub" | grep -q 'pruned: re-read' && pass "prune stubs superseded read of foo.sh" || fail "prune stub (got: $stub)"
+  # golden-output regression
+  if diff -q "$out" "$REPO_DIR/.claude/context/fixtures/sample_pruned.expected.jsonl" >/dev/null 2>&1; then
+    pass "prune matches golden"
+  else
+    fail "prune drifted from golden"
+  fi
+  rm -f "$out"
+fi
+
+# --- context engine: ctxprune clone ---
+if [ -x "$REPO_DIR/$CTXP" ]; then
+  tmpproj="$(mktemp -d)"; sid="00000000-0000-0000-0000-000000000001"
+  cp "$REPO_DIR/$FIX" "$tmpproj/$sid.jsonl"
+  out="$(CTX_PROJECTS_DIR="$tmpproj" "$REPO_DIR/$CTXP" clone "$sid" 2>/dev/null || true)"
+  printf '%s' "$out" | grep -q 'claude --resume' && pass "ctxprune clone prints resume cmd" || fail "ctxprune clone (got: $out)"
+  newid="$(printf '%s' "$out" | grep -oE 'resume [0-9a-f-]+' | awk '{print $2}')"
+  [ -n "$newid" ] && [ -f "$tmpproj/$newid.jsonl" ] && pass "ctxprune clone wrote new session file" || fail "ctxprune clone new file missing"
+  rm -rf "$tmpproj"
 fi
 
 printf '\nSUMMARY | PASS=%d FAIL=%d\n' "$pass_count" "$fail_count"

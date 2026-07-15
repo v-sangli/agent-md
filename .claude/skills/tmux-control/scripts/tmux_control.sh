@@ -2,6 +2,10 @@
 set -euo pipefail
 
 state_dir="${TMUX_CONTROL_STATE_DIR:-.tmux-control}"
+# Absolutize: runfiles are sourced inside the pane, whose cwd is the session
+# root, not the caller's — a relative runfile path breaks there. pwd -P so the
+# twin spellings of the workspace (/home symlink vs /data) share one state dir.
+case "$state_dir" in /*) ;; *) state_dir="$(pwd -P)/$state_dir" ;; esac
 
 usage() {
   cat <<'EOF'
@@ -64,7 +68,13 @@ resolve_target() {
   live="$(tmux list-panes -s -t "$session" -F '#{pane_id} #{pane_title}' 2>/dev/null |
     awk -v a="$alias" '{ t=$2; for (i=3; i<=NF; i++) t=t" "$i; if (t == a) { print $1; exit } }')"
   if [ -n "$live" ]; then
-    printf 'tmux-control: note: recorded pane for %s stale or missing (aliases file: %s); resolved live by pane title\n' "$target" "$file" >&2
+    # Self-heal: rewrite the stale entry so the next call takes the silent
+    # fast path. The note then fires exactly once per genuine drift.
+    if [ -f "$file" ]; then
+      awk -F= -v key="$alias" '$1 != key' "$file" >"$file.tmp" && mv "$file.tmp" "$file"
+    fi
+    save_alias "$session" "$alias" "$live"
+    printf 'tmux-control: note: recorded pane for %s was stale or missing (aliases file: %s); resolved live by pane title and healed the entry\n' "$target" "$file" >&2
     printf '%s\n' "$live"
     return
   fi
