@@ -47,8 +47,9 @@ printf '%s\n' 'set -x' 'make build' 'make test' |
     --target project-work::run --command - --label build-test --timeout 900
 ```
 
-On timeout the command keeps running in the pane; follow up with `wait-for`
-or `interrupt`.
+On timeout the command keeps running in the pane; the timeout message prints
+the exact `wait-for` resume command (unique `DONE_<id>` pattern) — use that
+rather than matching generic markers, which can hit stale scrollback.
 
 ## Capture
 

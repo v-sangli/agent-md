@@ -45,14 +45,31 @@ resolve_target() {
 
   local session="${target%%::*}"
   local alias="${target#*::}"
-  local file
+  local file pane
   file="$(alias_file "$session")"
-  [ -f "$file" ] || die "no aliases recorded for session '$session'"
+  pane=""
+  if [ -f "$file" ]; then
+    pane="$(awk -F= -v key="$alias" '$1 == key { print $2; found=1 } END { exit found ? 0 : 1 }' "$file" || true)"
+  fi
 
-  local pane
-  pane="$(awk -F= -v key="$alias" '$1 == key { print $2; found=1 } END { exit found ? 0 : 1 }' "$file")" \
-    || die "unknown alias '$alias' for session '$session'"
-  printf '%s\n' "$pane"
+  # Validate the recorded pane is alive; a wrong-cwd state dir or a replaced
+  # session leaves stale ids behind ("can't find pane: %NN" with no hint).
+  if [ -n "$pane" ] && tmux list-panes -s -t "$session" -F '#{pane_id}' 2>/dev/null | grep -qx "$pane"; then
+    printf '%s\n' "$pane"
+    return
+  fi
+
+  # Fallback: resolve live by pane title (start sets titles to role names).
+  local live
+  live="$(tmux list-panes -s -t "$session" -F '#{pane_id} #{pane_title}' 2>/dev/null |
+    awk -v a="$alias" '{ t=$2; for (i=3; i<=NF; i++) t=t" "$i; if (t == a) { print $1; exit } }')"
+  if [ -n "$live" ]; then
+    printf 'tmux-control: note: recorded pane for %s stale or missing (aliases file: %s); resolved live by pane title\n' "$target" "$file" >&2
+    printf '%s\n' "$live"
+    return
+  fi
+
+  die "cannot resolve '$alias' in session '$session' (aliases file: $file; live pane-title lookup also failed — check cwd/state dir and tmux session)"
 }
 
 send_keys() {
@@ -250,7 +267,8 @@ cmd_run() {
       slice="$(printf '%s\n' "$out" | awk -v b="^${begin}\$" 'found { print } $0 ~ b { found=1 }')"
       printf '%s\n' "$slice" >"$logfile"
       printf 'timeout\n' >"$ecfile"
-      printf 'tmux-control: run timed out after %ss (command still in pane; interrupt or wait-for manually)\n' "$timeout" >&2
+      printf 'tmux-control: run timed out after %ss (command still in pane)\n' "$timeout" >&2
+      printf 'tmux-control: resume: %s wait-for --target %s --pattern %s --timeout 600\n' "${BASH_SOURCE[0]}" "$target" "===TC_RUN_DONE_$id" >&2
       printf 'capture: %s\n' "$logfile"
       printf '%s\n' "$slice" | tail -n "$tail_n"
       return 124
