@@ -307,6 +307,25 @@ else
   pass "session_start output avoids removed scaffolding"
 fi
 
+# --- context engine: session_start reseed ---
+SS=".claude/hooks/session_start.sh"
+if [ -x "$REPO_DIR/$SS" ]; then
+  mkdir -p "$REPO_DIR/.claude/context/state"
+  echo "RESEED-MARKER-123" > "$REPO_DIR/.claude/context/state/recap.md"
+  out="$(printf '{"session_id":"testsid","source":"startup"}' | CLAUDE_PROJECT_DIR="$REPO_DIR" "$REPO_DIR/$SS" 2>/dev/null || true)"
+  printf '%s' "$out" | grep -q 'RESEED-MARKER-123' && pass "session_start injects recap on startup" || fail "session_start reseed (got: $out)"
+  [ ! -f "$REPO_DIR/.claude/context/state/recap.md" ] && pass "session_start consumes recap one-shot" || fail "recap not consumed"
+  rm -f "$REPO_DIR/.claude/context/state/"recap.*.consumed
+
+  # FIX 2: source="clear" is not startup/resume -> must not reseed, even
+  # though jq is present and recap.md exists.
+  echo "RESEED-MARKER-CLEAR" > "$REPO_DIR/.claude/context/state/recap.md"
+  out_clear="$(printf '{"session_id":"x","source":"clear"}' | CLAUDE_PROJECT_DIR="$REPO_DIR" "$REPO_DIR/$SS" 2>/dev/null || true)"
+  printf '%s' "$out_clear" | grep -q 'RESEED-MARKER-CLEAR' && fail "session_start reseeded on source=clear (got: $out_clear)" || pass "session_start does not reseed on source=clear"
+  [ -f "$REPO_DIR/.claude/context/state/recap.md" ] && pass "session_start leaves recap.md unconsumed on source=clear" || fail "recap.md was consumed on source=clear"
+  rm -f "$REPO_DIR/.claude/context/state/recap.md" "$REPO_DIR/.claude/context/state/"recap.*.consumed
+fi
+
 run_expect "access classifier asks for .claude write" 0 bash -lc '
 repo="$1"; cfg="$2"
 jq -n --arg path ".claude/settings.json" "{tool_name:\"Write\",tool_input:{file_path:\$path}}" |
@@ -402,6 +421,7 @@ R=\$HOME/x
 \$R /opt' '{tool_name:\"Bash\",tool_input:{command:\$c}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'); [ -z \"\$out\" ]"
 run_expect "tmux-control wait-for validates required options" 2 bash -lc "'$REPO_DIR/.claude/skills/tmux-control/scripts/tmux_control.sh' wait-for --pattern x"
 run_expect "tmux-control run validates required options" 2 bash -lc "'$REPO_DIR/.claude/skills/tmux-control/scripts/tmux_control.sh' run --command x"
+run_expect "tmux-control wait-for rejects pattern+run-id combo" 2 bash -lc "'$REPO_DIR/.claude/skills/tmux-control/scripts/tmux_control.sh' wait-for --target x::y --pattern a --run-id b"
 # Read-only interpreter probes run inline; real interpreter work stays on tmux.
 run_expect "pre_tool_use_bash_guard allows python version probe" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"python -V\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_pyver.out && jq -e '.hookSpecificOutput.permissionDecision == \"allow\"' /tmp/verify_pyver.out >/dev/null"
 run_expect "pre_tool_use_bash_guard allows python import probe" 0 bash -lc "jq -n --arg c 'python -c \"import dexdata_rs\"' '{tool_name:\"Bash\",tool_input:{command:\$c}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_pyimp.out && jq -e '.hookSpecificOutput.permissionDecision == \"allow\"' /tmp/verify_pyimp.out >/dev/null"
@@ -510,6 +530,16 @@ if [ -x "$REPO_DIR/$SGH" ]; then
   printf '%s' "$out2" | grep -qi 'context' && pass "stop gauge nudges over threshold" || fail "stop gauge should nudge (got: $out2)"
 fi
 
+# --- context engine: stop gauge handoff mode ---
+if [ -x "$REPO_DIR/$SGH" ]; then
+  rm -f "$REPO_DIR/.claude/context/state/handoff.pending" "$REPO_DIR/.claude/context/state/recap.md"
+  printf '{"transcript_path":"%s","hook_event_name":"Stop"}' "$REPO_DIR/$FIX" \
+    | CTX_NUDGE_FRACTION=0 CTX_HANDOFF_MODE=1 CLAUDE_PROJECT_DIR="$REPO_DIR" "$REPO_DIR/$SGH" >/dev/null 2>&1 || true
+  [ -f "$REPO_DIR/.claude/context/state/handoff.pending" ] && pass "handoff mode drops sentinel" || fail "no handoff.pending"
+  [ -f "$REPO_DIR/.claude/context/state/recap.md" ] && pass "handoff mode writes recap.md" || fail "no recap.md"
+  rm -f "$REPO_DIR/.claude/context/state/handoff.pending" "$REPO_DIR/.claude/context/state/recap.md"
+fi
+
 # --- context engine: ctxprune validate ---
 CTXP=".claude/context/ctxprune.sh"
 need_exec "$CTXP"
@@ -587,6 +617,36 @@ if [ -x "$REPO_DIR/$CTXP" ]; then
   run_expect "ctxprune validate malformed JSONL -> 1" 1 "$REPO_DIR/$CTXP" validate "$mal"
   run_expect "ctxprune prune malformed JSONL -> 1" 1 "$REPO_DIR/$CTXP" prune "$mal" "$malout"
   rm -f "$mal" "$malout"
+fi
+
+# --- context engine: claude-loop supervisor ---
+LOOP=".claude/context/claude-loop.sh"
+need_exec "$LOOP"
+if [ -x "$REPO_DIR/$LOOP" ]; then
+  cnt="$(mktemp)"; echo 0 > "$cnt"
+  stub="$(mktemp)"; cat > "$stub" <<'STUB'
+#!/usr/bin/env bash
+n="$(cat "$CNTFILE")"; n=$((n+1)); echo "$n" > "$CNTFILE"
+if [ "$n" = "1" ]; then : > "$HANDOFF"; fi   # first run requests handoff
+exit 0
+STUB
+  chmod +x "$stub"
+  HANDOFF="$REPO_DIR/.claude/context/state/handoff.pending" \
+  CNTFILE="$cnt" CTX_CLAUDE_CMD="$stub" FLUSH_SETTLE_SECS="${FLUSH_SETTLE_SECS:-0}" "$REPO_DIR/$LOOP" >/dev/null 2>&1 || true
+  runs="$(cat "$cnt")"
+  [ "$runs" = "2" ] && pass "supervisor relaunches once on handoff (2 runs)" || fail "supervisor runs=$runs want 2"
+  rm -f "$stub" "$cnt" "$REPO_DIR/.claude/context/state/handoff.pending"
+
+  # FIX 1: on the no-handoff path, the supervisor must propagate the child's
+  # exit code instead of always exiting 0.
+  stub42="$(mktemp)"; cat > "$stub42" <<'STUB42'
+#!/usr/bin/env bash
+exit 42
+STUB42
+  chmod +x "$stub42"
+  handoff42="$(mktemp -u)"
+  run_expect "supervisor propagates child exit" 42 env CTX_CLAUDE_CMD="$stub42" HANDOFF="$handoff42" FLUSH_SETTLE_SECS=0 bash "$REPO_DIR/$LOOP"
+  rm -f "$stub42" "$handoff42"
 fi
 
 printf '\nSUMMARY | PASS=%d FAIL=%d\n' "$pass_count" "$fail_count"

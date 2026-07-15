@@ -23,3 +23,17 @@ POINTERS:
 - Use tmux-control when work needs visible shell execution.
 - Use bash .claude/verify_setup.sh after harness changes.
 EOF
+
+# --- context-engine reseed (one-shot) ---
+STATE_DIR="$ROOT_DIR/.claude/context/state"
+RECAP="$STATE_DIR/recap.md"
+if command -v jq >/dev/null 2>&1; then
+  src="$(printf '%s' "$payload" | jq -r '.source // "startup"' 2>/dev/null || echo startup)"
+  if { [ "$src" = "startup" ] || [ "$src" = "resume" ]; } && [ -f "$RECAP" ]; then
+    echo ""
+    echo "PRIOR-SESSION RECAP (context-engine reseed):"
+    cat "$RECAP" || true
+    sid="$(printf '%s' "$payload" | jq -r '.session_id // "unknown"' 2>/dev/null || echo unknown)"
+    mv "$RECAP" "$STATE_DIR/recap.$sid.consumed" 2>/dev/null || true
+  fi
+fi

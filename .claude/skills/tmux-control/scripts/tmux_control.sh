@@ -14,7 +14,7 @@ Usage:
   tmux_control.sh send --target SESSION::ALIAS --command COMMAND [--no-enter]
   tmux_control.sh run --target SESSION::ALIAS --command COMMAND|- [--timeout SECONDS] [--interval SECONDS] [--label LABEL] [--tail N] [--scrollback N]
   tmux_control.sh capture --target SESSION::ALIAS [--lines N] [--join-wrapped] [--output FILE]
-  tmux_control.sh wait-for --target SESSION::ALIAS --pattern ERE [--timeout SECONDS] [--interval SECONDS] [--lines N]
+  tmux_control.sh wait-for --target SESSION::ALIAS (--pattern ERE | --run-id ID) [--timeout SECONDS] [--interval SECONDS] [--lines N]
   tmux_control.sh status [--session NAME]
   tmux_control.sh interrupt --target SESSION::ALIAS
   tmux_control.sh root-request --session NAME [--cwd DIR] --command COMMAND
@@ -190,11 +190,12 @@ cmd_capture() {
 }
 
 cmd_wait_for() {
-  local target="" pattern="" timeout=120 interval=2 lines=60
+  local target="" pattern="" run_id="" timeout=120 interval=2 lines=60
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --target) target="${2:-}"; shift 2 ;;
       --pattern) pattern="${2:-}"; shift 2 ;;
+      --run-id) run_id="${2:-}"; shift 2 ;;
       --timeout) timeout="${2:-120}"; shift 2 ;;
       --interval) interval="${2:-2}"; shift 2 ;;
       --lines) lines="${2:-60}"; shift 2 ;;
@@ -202,7 +203,13 @@ cmd_wait_for() {
     esac
   done
   [ -n "$target" ] || die "wait-for requires --target"
-  [ -n "$pattern" ] || die "wait-for requires --pattern"
+  if [ -n "$run_id" ]; then
+    [ -z "$pattern" ] || die "wait-for takes --pattern or --run-id, not both"
+    # Anchored completion marker for a specific run: immune to echoed text
+    # and stale scrollback, unlike a user-supplied pattern.
+    pattern="^===TC_RUN_DONE_${run_id} ec="
+  fi
+  [ -n "$pattern" ] || die "wait-for requires --pattern or --run-id"
   local pane out waited=0
   pane="$(resolve_target "$target")"
   while :; do
@@ -278,8 +285,8 @@ cmd_run() {
       printf '%s\n' "$slice" >"$logfile"
       printf 'timeout\n' >"$ecfile"
       printf 'tmux-control: run timed out after %ss (command still in pane)\n' "$timeout" >&2
-      printf 'tmux-control: resume: %s wait-for --target %s --pattern %s --timeout 600\n' "${BASH_SOURCE[0]}" "$target" "===TC_RUN_DONE_$id" >&2
-      printf 'capture: %s\n' "$logfile"
+      printf 'tmux-control: resume: %s wait-for --target %s --run-id %s --timeout 600\n' "${BASH_SOURCE[0]}" "$target" "$id" >&2
+      printf 'exit=timeout capture=%s\n' "$logfile"
       printf '%s\n' "$slice" | tail -n "$tail_n"
       return 124
     fi

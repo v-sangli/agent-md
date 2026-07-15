@@ -48,8 +48,9 @@ printf '%s\n' 'set -x' 'make build' 'make test' |
 ```
 
 On timeout the command keeps running in the pane; the timeout message prints
-the exact `wait-for` resume command (unique `DONE_<id>` pattern) — use that
-rather than matching generic markers, which can hit stale scrollback.
+the exact `wait-for --run-id <id>` resume command — run it verbatim. The
+`--run-id` form composes the anchored completion pattern internally, so it is
+immune to echoed text and stale scrollback, unlike a hand-written `--pattern`.
 
 ## Capture
 
