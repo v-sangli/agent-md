@@ -16,6 +16,8 @@ Smoke-test the helper without running destructive commands:
 .claude/skills/tmux-control/scripts/tmux_control.sh start --session tmux-control-smoke --root "$PWD" --roles run,logs --replace
 .claude/skills/tmux-control/scripts/tmux_control.sh send --target tmux-control-smoke::run --command 'printf "tmux-control-ok\n"'
 .claude/skills/tmux-control/scripts/tmux_control.sh capture --target tmux-control-smoke::run --lines 20
+.claude/skills/tmux-control/scripts/tmux_control.sh run --target tmux-control-smoke::run --command 'echo run-ok' --label validate
+.claude/skills/tmux-control/scripts/tmux_control.sh run --target tmux-control-smoke::run --command 'false' --label validate-ec; echo "expect 1: $?"
 .claude/skills/tmux-control/scripts/tmux_control.sh status --session tmux-control-smoke
 tmux kill-session -t tmux-control-smoke
 ```

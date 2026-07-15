@@ -100,6 +100,15 @@ case "$level" in
     exit 0
     ;;
   ask)
+    # Statically-unresolvable targets ($VAR, $(mktemp), $REPO/$f) were the
+    # main ask-friction source and are indistinguishable from safe scratch
+    # paths. When every ASK finding is dynamic, fall through to the native
+    # engine instead of asking (decision 2026-07-15, HARNESS_CHECKLIST.md).
+    # Any resolved external target still asks.
+    ask_lines="$(printf '%s\n' "$reason" | grep -F -- '- ASK:' || true)"
+    if [ -n "$ask_lines" ] && ! printf '%s\n' "$ask_lines" | grep -Fqv '(dynamic or unresolved path)'; then
+      exit 0
+    fi
     emit ask "This command writes or deletes outside the workspace and /tmp. Approve to run it once, or grant a root in .claude/access.conf to stop being asked. $reason"
     exit 0
     ;;

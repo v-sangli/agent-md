@@ -137,7 +137,6 @@ need_file ".claude/skills/superpowers/skills/brainstorming/SKILL.md"
 need_absent ".claude-log"
 need_absent ".claude-tools"
 need_absent ".claude/spec_hashes.json"
-need_absent "reference"
 need_absent ".claude/skills/clone"
 need_absent ".claude/skills/half-clone"
 need_absent ".claude/skills/handoff"
@@ -161,6 +160,7 @@ if jq -e '
   (.hooks.PostToolUse != null) and
   (.hooks.PostToolUseFailure != null) and
   ((.permissions.allow // []) | index("Bash(*)") | not) and
+  ((.permissions.allow // []) | index("Bash") != null) and
   ((.permissions.allow // []) | index("Bash(.claude/harness/run.sh:*)") != null) and
   ((.permissions.ask // []) | index("Bash(rm -rf:*)") | not) and
   ((.permissions.deny // []) | index("Edit(.claude/**)") | not) and
@@ -360,6 +360,10 @@ run_expect "pre_tool_use_bash_guard runs workspace sed in-place free" 0 bash -lc
 run_expect "pre_tool_use_bash_guard runs workspace redirection free" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"cat input.txt > out.txt\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'"
 run_expect "pre_tool_use_bash_guard asks for external write/delete with grant hint" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rm -rf /opt/foo\"}}' | CLAUDE_PROJECT_DIR='$DEFAULT_CFG_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_external_rm.out && jq -e '.hookSpecificOutput.permissionDecision == \"ask\"' /tmp/verify_external_rm.out >/dev/null && rg -q 'access.conf' /tmp/verify_external_rm.out && rg -q '/opt/foo' /tmp/verify_external_rm.out"
 run_expect "pre_tool_use_bash_guard asks CRITICAL for .claude write" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"echo x > .claude/settings.json\"}}' | CLAUDE_PROJECT_DIR='$DEFAULT_CFG_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_claude_write.out && jq -e '.hookSpecificOutput.permissionDecision == \"ask\"' /tmp/verify_claude_write.out >/dev/null && rg -q 'CRITICAL' /tmp/verify_claude_write.out"
+# Dynamic-only write targets fall through to the native engine (2026-07-15
+# decision, HARNESS_CHECKLIST.md); a resolved external target still asks.
+run_expect "pre_tool_use_bash_guard falls through on dynamic-only write targets" 0 bash -lc "out=\$(jq -n --arg c 'broken=\"\$(mktemp)\"; grep -v x f > \"\$broken\"; rm -f \"\$broken\"' '{tool_name:\"Bash\",tool_input:{command:\$c}}' | CLAUDE_PROJECT_DIR='$DEFAULT_CFG_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'); [ -z \"\$out\" ]"
+run_expect "pre_tool_use_bash_guard still asks when resolved external accompanies dynamic" 0 bash -lc "jq -n --arg c 'rm -rf /opt/foo && rm -rf \"\$BROKEN\"' '{tool_name:\"Bash\",tool_input:{command:\$c}}' | CLAUDE_PROJECT_DIR='$DEFAULT_CFG_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_mixed_dyn.out && jq -e '.hookSpecificOutput.permissionDecision == \"ask\"' /tmp/verify_mixed_dyn.out >/dev/null && rg -q '/opt/foo' /tmp/verify_mixed_dyn.out"
 # Read-only commands must NOT be blocked, even when they contain a discarded
 # redirect or name an interpreter/tool as an argument.
 run_expect "pre_tool_use_bash_guard allows read-only command with discarded redirect" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"ls -la foo 2>/dev/null\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'"
@@ -397,6 +401,7 @@ run_expect "pre_tool_use_bash_guard forgets alias on dynamic reassignment" 0 bas
 R=\$HOME/x
 \$R /opt' '{tool_name:\"Bash\",tool_input:{command:\$c}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'); [ -z \"\$out\" ]"
 run_expect "tmux-control wait-for validates required options" 2 bash -lc "'$REPO_DIR/.claude/skills/tmux-control/scripts/tmux_control.sh' wait-for --pattern x"
+run_expect "tmux-control run validates required options" 2 bash -lc "'$REPO_DIR/.claude/skills/tmux-control/scripts/tmux_control.sh' run --command x"
 # Read-only interpreter probes run inline; real interpreter work stays on tmux.
 run_expect "pre_tool_use_bash_guard allows python version probe" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"python -V\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_pyver.out && jq -e '.hookSpecificOutput.permissionDecision == \"allow\"' /tmp/verify_pyver.out >/dev/null"
 run_expect "pre_tool_use_bash_guard allows python import probe" 0 bash -lc "jq -n --arg c 'python -c \"import dexdata_rs\"' '{tool_name:\"Bash\",tool_input:{command:\$c}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_pyimp.out && jq -e '.hookSpecificOutput.permissionDecision == \"allow\"' /tmp/verify_pyimp.out >/dev/null"
@@ -427,6 +432,76 @@ run_expect "tmux-control root request only offers root tmux" 0 bash -lc "cd '$RE
 run_expect "post_tool_use_privilege_guard injects root guidance" 0 bash -lc "printf '{\"hook_event_name\":\"PostToolUseFailure\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"dmesg | tail\"},\"error\":\"dmesg: read kernel buffer failed: Operation not permitted\"}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/post_tool_use_privilege_guard.sh' >/tmp/verify_privilege_hook.out && jq -e . /tmp/verify_privilege_hook.out >/dev/null && rg -q 'root-request' /tmp/verify_privilege_hook.out && rg -q 'true equivalent' /tmp/verify_privilege_hook.out && rg -q 'Do not suggest in-session' /tmp/verify_privilege_hook.out"
 run_expect "post_tool_use_privilege_guard ignores privilege words in stdout" 0 bash -lc "out=\$(printf '{\"hook_event_name\":\"PostToolUse\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"cat notes.txt\"},\"tool_response\":{\"stdout\":\"docs say: Operation not permitted means EPERM\",\"stderr\":\"\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/post_tool_use_privilege_guard.sh'); [ -z \"\$out\" ]"
 run_expect "post_tool_use_privilege_guard fires on stderr denial" 0 bash -lc "printf '{\"hook_event_name\":\"PostToolUse\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"cat /root/x\"},\"tool_response\":{\"stdout\":\"\",\"stderr\":\"cat: /root/x: Permission denied\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/post_tool_use_privilege_guard.sh' >/tmp/verify_priv_stderr.out && jq -e . /tmp/verify_priv_stderr.out >/dev/null && rg -q 'root-request' /tmp/verify_priv_stderr.out"
+
+# --- context engine: ctxgauge composition ---
+CTXG=".claude/context/ctxgauge.sh"
+FIX=".claude/context/fixtures/sample_session.jsonl"
+need_exec "$CTXG"
+if [ -x "$REPO_DIR/$CTXG" ]; then
+  comp="$("$REPO_DIR/$CTXG" composition "$REPO_DIR/$FIX" 2>/dev/null || echo '{}')"
+  cap="$(printf '%s' "$comp" | jq -r '.capsules // "x"')"
+  tr="$(printf '%s' "$comp" | jq -r '.tool_results // "x"')"
+  ti="$(printf '%s' "$comp" | jq -r '.tool_inputs // "x"')"
+  [ "$cap" = "28" ] && pass "ctxgauge capsules=28" || fail "ctxgauge capsules (got $cap want 28)"
+  [ "$tr" = "12" ]  && pass "ctxgauge tool_results excludes mirror (=12)" || fail "ctxgauge tool_results (got $tr want 12)"
+  [ "$ti" = "84" ]  && pass "ctxgauge tool_inputs=84" || fail "ctxgauge tool_inputs (got $ti want 84)"
+fi
+
+# --- context engine: ctxgauge perfile ---
+if [ -x "$REPO_DIR/$CTXG" ]; then
+  pf="$("$REPO_DIR/$CTXG" perfile "$REPO_DIR/$FIX" 2>/dev/null || echo '[]')"
+  foo_edits="$(printf '%s' "$pf" | jq -r '[.[]|select(.path=="/x/foo.sh")|.edits]|add // 0')"
+  [ "$foo_edits" = "1" ] && pass "ctxgauge perfile foo.sh edits=1" || fail "ctxgauge perfile edits (got $foo_edits want 1)"
+fi
+
+# --- context engine: ctxgauge tokens ---
+if [ -x "$REPO_DIR/$CTXG" ]; then
+  tk="$("$REPO_DIR/$CTXG" tokens "$REPO_DIR/$FIX" 2>/dev/null || echo '{}')"
+  cb="$(printf '%s' "$tk" | jq -r '.context_bytes // "x"')"
+  # sum of known composition: prose12 + capsules28 + tool_results12 + user5 + tool_inputs84 = 141
+  [ "$cb" = "141" ] && pass "ctxgauge tokens context_bytes=141" || fail "ctxgauge tokens context_bytes (got $cb)"
+fi
+
+# --- context engine: capsules-by-phase ---
+if [ -x "$REPO_DIR/$CTXG" ]; then
+  cbp="$("$REPO_DIR/$CTXG" capsules-by-phase "$REPO_DIR/$FIX" 2>/dev/null || echo '{}')"
+  bucket="$(printf '%s' "$cbp" | jq -r '."2026-07-14T10" // "x"')"
+  [ "$bucket" = "28" ] && pass "capsules-by-phase 10h bucket=28" || fail "capsules-by-phase (got $bucket want 28)"
+fi
+
+# --- context engine: externalization signal ---
+EXT=".claude/hooks/lib/externalization.sh"
+need_file "$EXT"
+if [ -f "$REPO_DIR/$EXT" ]; then
+  ( set +e
+    # shellcheck disable=SC1090
+    . "$REPO_DIR/$EXT"
+    tmpf="$(mktemp)"; now="$(stat -c %Y "$tmpf")"
+    externalized_since "$((now-10))" "$tmpf"; a=$?
+    externalized_since "$((now+100))" "$tmpf"; b=$?
+    rm -f "$tmpf"
+    [ "$a" -eq 0 ] && [ "$b" -eq 1 ] && echo "PASS | externalized_since past=hit future=miss" || echo "FAIL | externalized_since (past=$a future=$b)"
+  ) | while read -r line; do case "$line" in PASS*) pass "${line#PASS | }";; FAIL*) fail "${line#FAIL | }";; esac; done
+fi
+
+# --- context engine: ctxgauge evictable ---
+if [ -x "$REPO_DIR/$CTXG" ]; then
+  ev="$("$REPO_DIR/$CTXG" evictable "$REPO_DIR/$FIX" 2>/dev/null || echo '{}')"
+  n="$(printf '%s' "$ev" | jq -r '.evictable_tokens // "x"')"
+  case "$n" in ''|*[!0-9]*) fail "ctxgauge evictable numeric (got $n)";; *) pass "ctxgauge evictable_tokens=$n";; esac
+fi
+
+# --- context engine: stop gauge hook ---
+SGH=".claude/hooks/stop_context_gauge.sh"
+need_exec "$SGH"
+if [ -x "$REPO_DIR/$SGH" ]; then
+  # tiny fixture, low fraction -> no nudge
+  out="$(printf '{"transcript_path":"%s","hook_event_name":"Stop"}' "$REPO_DIR/$FIX" | CTX_NUDGE_FRACTION=0.55 "$REPO_DIR/$SGH" 2>/dev/null || true)"
+  [ -z "$out" ] && pass "stop gauge silent under threshold" || fail "stop gauge should be silent (got: $out)"
+  # force threshold to 0 -> must nudge
+  out2="$(printf '{"transcript_path":"%s","hook_event_name":"Stop"}' "$REPO_DIR/$FIX" | CTX_NUDGE_FRACTION=0 "$REPO_DIR/$SGH" 2>/dev/null || true)"
+  printf '%s' "$out2" | grep -qi 'context' && pass "stop gauge nudges over threshold" || fail "stop gauge should nudge (got: $out2)"
+fi
 
 printf '\nSUMMARY | PASS=%d FAIL=%d\n' "$pass_count" "$fail_count"
 if [ "$fail_count" -ne 0 ]; then

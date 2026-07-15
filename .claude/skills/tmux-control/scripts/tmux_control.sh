@@ -8,6 +8,7 @@ usage() {
 Usage:
   tmux_control.sh start --session NAME [--root DIR] [--roles a,b,c] [--replace]
   tmux_control.sh send --target SESSION::ALIAS --command COMMAND [--no-enter]
+  tmux_control.sh run --target SESSION::ALIAS --command COMMAND|- [--timeout SECONDS] [--interval SECONDS] [--label LABEL] [--tail N] [--scrollback N]
   tmux_control.sh capture --target SESSION::ALIAS [--lines N] [--join-wrapped] [--output FILE]
   tmux_control.sh wait-for --target SESSION::ALIAS --pattern ERE [--timeout SECONDS] [--interval SECONDS] [--lines N]
   tmux_control.sh status [--session NAME]
@@ -193,6 +194,79 @@ cmd_wait_for() {
   done
 }
 
+# run: send + wait-for-completion + scoped capture + exit-code file, one call.
+# Replaces the send/sleep-guess/capture and hand-rolled sentinel-poll patterns.
+# The payload is written to a runfile and *sourced* in the pane shell, so env
+# changes made by the payload (e.g. conda activate) persist for later runs.
+# Multi-line payloads are fine: pass --command - and pipe them on stdin.
+# Exit code: the payload's own (last command), or 124 on timeout.
+cmd_run() {
+  local target="" command="" timeout=300 interval=2 label="" tail_n=40 scrollback=5000
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --target) target="${2:-}"; shift 2 ;;
+      --command) command="${2:-}"; shift 2 ;;
+      --timeout) timeout="${2:-300}"; shift 2 ;;
+      --interval) interval="${2:-2}"; shift 2 ;;
+      --label) label="${2:-}"; shift 2 ;;
+      --tail) tail_n="${2:-40}"; shift 2 ;;
+      --scrollback) scrollback="${2:-5000}"; shift 2 ;;
+      *) die "unknown run option: $1" ;;
+    esac
+  done
+  [ -n "$target" ] || die "run requires --target"
+  [ -n "$command" ] || die "run requires --command (use '-' to read stdin)"
+  if [ "$command" = "-" ]; then
+    command="$(cat)"
+    [ -n "$command" ] || die "run: empty command on stdin"
+  fi
+  [ -n "$label" ] || label="$(printf '%s' "$command" | head -n1 | awk '{print $1}')"
+  label="$(sanitize "${label:-run}")"
+
+  local pane id ts run_dir cap_dir runfile logfile ecfile
+  pane="$(resolve_target "$target")"
+  ts="$(date +%Y%m%dT%H%M%S)"
+  id="${ts}_$$"
+  run_dir="$state_dir/runs"
+  cap_dir="$state_dir/captures"
+  mkdir -p "$run_dir" "$cap_dir"
+  runfile="$run_dir/$id-$label.sh"
+  logfile="$cap_dir/$ts-$label.log"
+  ecfile="$cap_dir/$ts-$label.ec"
+  printf '%s\n' "$command" >"$runfile"
+
+  # BEGIN/DONE markers bracket exactly this run's output. The typed line
+  # splits each marker across two quoted strings so the echoed command line
+  # can never match the anchored patterns below.
+  local begin="===TC_RUN_BEGIN_$id===" done_pat="===TC_RUN_DONE_$id"
+  send_keys "$pane" "printf '===TC_RUN_''BEGIN_$id===\\n'; . $(printf '%q' "$runfile"); printf '===TC_RUN_''DONE_$id ec=%d===\\n' \"\$?\""
+
+  local waited=0 out slice ec=""
+  while :; do
+    out="$(tmux capture-pane -p -t "$pane" -S "-$scrollback")"
+    ec="$(printf '%s\n' "$out" | grep -E "^${done_pat} ec=[0-9]+===\$" | tail -n1 | sed -E 's/.* ec=([0-9]+)===$/\1/')" || true
+    [ -n "$ec" ] && break
+    if [ "$waited" -ge "$timeout" ]; then
+      slice="$(printf '%s\n' "$out" | awk -v b="^${begin}\$" 'found { print } $0 ~ b { found=1 }')"
+      printf '%s\n' "$slice" >"$logfile"
+      printf 'timeout\n' >"$ecfile"
+      printf 'tmux-control: run timed out after %ss (command still in pane; interrupt or wait-for manually)\n' "$timeout" >&2
+      printf 'capture: %s\n' "$logfile"
+      printf '%s\n' "$slice" | tail -n "$tail_n"
+      return 124
+    fi
+    sleep "$interval"
+    waited=$((waited + interval))
+  done
+
+  slice="$(printf '%s\n' "$out" | awk -v b="^${begin}\$" -v d="^${done_pat} " '$0 ~ d { exit } found { print } $0 ~ b { found=1 }')"
+  printf '%s\n' "$slice" >"$logfile"
+  printf '%s\n' "$ec" >"$ecfile"
+  printf 'exit=%s capture=%s\n' "$ec" "$logfile"
+  printf '%s\n' "$slice" | tail -n "$tail_n"
+  return "$ec"
+}
+
 cmd_status() {
   local session=""
   while [ "$#" -gt 0 ]; do
@@ -267,6 +341,7 @@ shift
 case "$cmd" in
   start) cmd_start "$@" ;;
   send) cmd_send "$@" ;;
+  run) cmd_run "$@" ;;
   capture) cmd_capture "$@" ;;
   wait-for) cmd_wait_for "$@" ;;
   status) cmd_status "$@" ;;

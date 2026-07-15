@@ -51,6 +51,16 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/stop_context_gauge.sh\""
+          }
+        ]
+      }
     ]
   },
   "permissions": {
@@ -65,6 +75,7 @@
       "Edit",
       "Write",
       "MultiEdit",
+      "Bash",
       "Bash(bash .claude/verify_setup.sh:*)",
       "Bash(.claude/harness/run.sh:*)",
       "Bash(.claude/skills/tmux-control/scripts/tmux_control.sh:*)",

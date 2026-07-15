@@ -21,9 +21,13 @@ Use the bundled helper:
 
 ```bash
 .claude/skills/tmux-control/scripts/tmux_control.sh start --session <name> --root "$PWD" --roles run,logs --replace
-.claude/skills/tmux-control/scripts/tmux_control.sh send --target <name>::run --command '<command>'
-.claude/skills/tmux-control/scripts/tmux_control.sh capture --target <name>::run --lines 200
+.claude/skills/tmux-control/scripts/tmux_control.sh run --target <name>::run --command '<command>' --label <label> --timeout 600
 ```
+
+`run` is the default workhorse: one call does send + completion-wait + scoped
+capture + exit code (no sleep-guessing, no stale scrollback). Reach for the
+lower-level `send`/`capture`/`wait-for` when driving interactive processes or
+watching an already-running command.
 
 Read [references/commands.md](references/commands.md) for command examples.
 
