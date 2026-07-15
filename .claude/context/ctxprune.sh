@@ -8,6 +8,10 @@ cmd="${1:-}"; arg="${2:-}"
 
 validate() {
   local uses results orphans
+  if ! jq -e . "$1" >/dev/null 2>&1; then
+    echo "ctxprune: malformed JSONL: $1" >&2
+    return 1
+  fi
   uses="$(jq -r '.message.content[]?|select(.type=="tool_use")|.id' "$1" 2>/dev/null | sort -u)"
   results="$(jq -r '.message.content[]?|select(.type=="tool_result")|.tool_use_id' "$1" 2>/dev/null | sort -u)"
   orphans="$(comm -3 <(printf '%s\n' "$uses") <(printf '%s\n' "$results") | tr -d '\t' | sed '/^$/d')"
@@ -22,6 +26,11 @@ validate() {
 prune() {
   local in="$1" out="${2:-}"
   [ -n "$out" ] || { echo "prune requires out path" >&2; return 2; }
+
+  if ! jq -e . "$in" >/dev/null 2>&1; then
+    echo "ctxprune: malformed JSONL: $in" >&2
+    return 1
+  fi
 
   # 1) paths that get a later Write/Edit/MultiEdit -> their earlier Read results are superseded
   local superseded_paths
@@ -44,7 +53,7 @@ prune() {
 
   # 3) uuid of the last assistant line -> keep only its thinking capsules
   local last_assistant_uuid
-  last_assistant_uuid="$(jq -rs '[.[]|select(.type=="assistant")]|last|.uuid // ""' "$in" 2>/dev/null)"
+  last_assistant_uuid="$(jq -rs '[.[]|select(.type=="assistant" and (.isSidechain != true))]|last|.uuid // ""' "$in" 2>/dev/null)"
 
   local stub_json
   stub_json="$(printf '%s\n' "$stub_ids" | sed '/^$/d' | jq -R . | jq -s .)"
@@ -77,6 +86,9 @@ clone() {
   local newid
   newid="$(sha1sum "$in" | cut -c1-8)-0000-0000-0000-$(sha1sum "$in" | cut -c9-20)"
   local out="$proj/$newid.jsonl"
+  if [ -e "$out" ]; then
+    echo "ctxprune: warning: overwriting existing clone output: $out" >&2
+  fi
   prune "$in" "$out"
   validate "$out" || { echo "pruned clone failed validation; not resuming" >&2; return 1; }
   echo "Pruned clone ready. Resume with:"

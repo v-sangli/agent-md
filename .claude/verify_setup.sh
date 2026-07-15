@@ -554,6 +554,41 @@ if [ -x "$REPO_DIR/$CTXP" ]; then
   rm -rf "$tmpproj"
 fi
 
+# --- context engine: ctxprune sidechain-last-line regression (FIX 1) ---
+# A subagent sidechain assistant line landing last in the file must not be
+# mistaken for the real last main-chain turn; the kept thinking capsule must
+# be the main-chain one (MAINSIG), not the trailing sidechain's (SUBSIG).
+if [ -x "$REPO_DIR/$CTXP" ]; then
+  sc="$(mktemp)"
+  {
+    printf '%s\n' '{"type":"user","message":{"role":"user","content":[{"type":"text","text":"hi"}]}}'
+    printf '%s\n' '{"type":"assistant","uuid":"a2","message":{"role":"assistant","content":[{"type":"thinking","thinking":"main","signature":"MAINSIG"},{"type":"tool_use","id":"tu1","name":"Task","input":{"description":"spawn"}}]}}'
+    printf '%s\n' '{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"tu1","content":"dispatched"}]}}'
+    printf '%s\n' '{"type":"assistant","uuid":"sub1","isSidechain":true,"message":{"role":"assistant","content":[{"type":"thinking","thinking":"sub","signature":"SUBSIG"}]}}'
+  } > "$sc"
+  scout="$(mktemp)"
+  "$REPO_DIR/$CTXP" prune "$sc" "$scout" 2>/dev/null || true
+  sig="$(jq -r '.message.content[]?|select(.type=="thinking")|.signature' "$scout" 2>/dev/null)"
+  [ "$sig" = "MAINSIG" ] && pass "prune keeps main-chain last capsule, not trailing sidechain" || fail "prune sidechain regression (got sig='$sig' want MAINSIG)"
+  run_expect "pruned sidechain-regression output validates" 0 "$REPO_DIR/$CTXP" validate "$scout"
+  rm -f "$sc" "$scout"
+fi
+
+# --- context engine: ctxprune malformed JSONL guard (FIX 2) ---
+# A trailing truncated JSON line must not crash validate/prune under
+# set -euo pipefail; both must fail clean with exit 1, not a raw jq abort.
+if [ -x "$REPO_DIR/$CTXP" ]; then
+  mal="$(mktemp)"
+  {
+    printf '%s\n' '{"type":"user","message":{"role":"user","content":[{"type":"text","text":"hi"}]}}'
+    printf '%s' '{"type":"assistant"'
+  } > "$mal"
+  malout="$(mktemp)"
+  run_expect "ctxprune validate malformed JSONL -> 1" 1 "$REPO_DIR/$CTXP" validate "$mal"
+  run_expect "ctxprune prune malformed JSONL -> 1" 1 "$REPO_DIR/$CTXP" prune "$mal" "$malout"
+  rm -f "$mal" "$malout"
+fi
+
 printf '\nSUMMARY | PASS=%d FAIL=%d\n' "$pass_count" "$fail_count"
 if [ "$fail_count" -ne 0 ]; then
   exit 1
