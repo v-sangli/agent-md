@@ -16,9 +16,12 @@ case "$command_text" in
   *".claude/skills/tmux-control/scripts/tmux_control.sh root-request"*) exit 0 ;;
 esac
 
+# Only error/stderr text counts as a privilege signal. Scanning every string
+# in the payload (including stdout) made reading any file that merely contains
+# the words "Operation not permitted" fire this advisory.
 event_text="$(
   printf '%s' "$payload" |
-    jq -r '.. | strings' 2>/dev/null |
+    jq -r '[(.error // empty), (.tool_response.stderr // empty), (.tool_response.error // empty)] | map(tostring) | join("\n")' 2>/dev/null |
     tr '[:upper:]' '[:lower:]' || true
 )"
 hook_event="$(printf '%s' "$payload" | jq -r '.hook_event_name // "PostToolUse"' 2>/dev/null || printf 'PostToolUse')"

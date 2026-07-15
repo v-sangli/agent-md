@@ -23,6 +23,10 @@ This is not negotiable. You cannot rationalize your way out of this.
 
 Then announce "Using [skill] to [purpose]" and follow the skill exactly. If it has a checklist, create a todo per item.
 
+## When No Skill Matches
+
+The mandatory step is checking the skill list, not invoking something from it. If the task is read-only — exploring or explaining code, answering a question, summarizing state — and no available skill's trigger conditions match it, proceed without a skill. Do not invoke a process skill as a stand-in: brainstorming triggers on creating or changing behavior, systematic-debugging on unexpected behavior; a task that changes nothing triggers neither.
+
 ## Skill Priority
 
 When multiple skills apply, process skills come first — they set the approach, then implementation skills (frontend-design, etc.) carry it out. Brainstorming and systematic-debugging are Superpowers' most common process skills, but the rule holds for any of them.

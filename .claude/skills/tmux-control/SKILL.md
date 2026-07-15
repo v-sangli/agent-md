@@ -1,6 +1,6 @@
 ---
 name: tmux-control
-description: Run shell work through visible persistent tmux sessions. Use when Codex needs to run benchmarks, tests, installs, builds, migrations, long-running jobs, nested Claude/agent sessions, interactive debuggers, commands requiring live observation/interruption, or any command involving sudo, credentials, passwords, or root-terminal prompts.
+description: Run shell work through visible persistent tmux sessions. Use when Claude needs to run benchmarks, tests, installs, builds, migrations, long-running jobs, nested Claude/agent sessions, interactive debuggers, commands requiring live observation/interruption, or any command involving sudo, credentials, passwords, or root-terminal prompts.
 ---
 
 # Tmux Control

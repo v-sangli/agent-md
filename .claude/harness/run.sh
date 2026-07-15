@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd -P)"
 ACCESS_GUARD="$ROOT_DIR/.claude/hooks/access_guard.sh"
+
+# Shared head-classification (same source the PreToolUse guards use).
+. "$ROOT_DIR/.claude/hooks/lib/command_scan.sh"
 
 usage() {
   cat <<'EOF'
@@ -38,7 +41,9 @@ case "$command_text" in
   *".claude/harness/run.sh"*) die "refusing recursive harness invocation" ;;
 esac
 
-if printf '%s\n' "$command_text" | grep -Eq '(^|[;&|()[:space:]])sudo([[:space:]]|$)'; then
+harness_class="$(cs_transparency_class "$command_text")"
+
+if [ "$harness_class" = "sudo" ]; then
   safe_name="$(
     printf '%s' "$command_text" |
       tr '[:upper:]' '[:lower:]' |
@@ -56,8 +61,7 @@ EOF
   exit 3
 fi
 
-long_or_mutating='(^|[;&|()[:space:]])(python|python3|pytest|uv|pip|pipx|npm|pnpm|yarn|bun|cargo|make|cmake|go|bash[[:space:]]+-c|sh[[:space:]]+-c|git[[:space:]]+clone|git[[:space:]]+pull|git[[:space:]]+checkout|git[[:space:]]+switch|git[[:space:]]+worktree|bugsinpy-|claude)([[:space:]]|$)'
-if printf '%s\n' "$command_text" | grep -Eq "$long_or_mutating"; then
+if [ "$harness_class" = "interpreter" ]; then
   cat >&2 <<'EOF'
 Harness runner refused this command.
 Use tmux-control for tests, installs, builds, benchmarks, nested agents, interpreters, and other long-running or opaque workflows.

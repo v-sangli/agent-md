@@ -5,13 +5,13 @@ This file defines the default runtime environment for this repository.
 ## Default Python Environment
 
 - Environment manager: `conda`
-- Activation script: `~/miniconda3/bin/activate`
+- Activation script: `/data/miniconda3/bin/activate` (there is no `~/miniconda3` on this machine — verified 2026-07-14)
 - Default environment name: `dexpolicy`
 
 ## Activation
 
 ```bash
-source ~/miniconda3/bin/activate dexpolicy
+source /data/miniconda3/bin/activate dexpolicy
 ```
 
 ## Validation
@@ -20,6 +20,10 @@ source ~/miniconda3/bin/activate dexpolicy
 python -V
 which python
 ```
+
+## Worktrees
+
+- A package resolves to its installed location in the env, not to your cwd; before trusting a worktree's tests, confirm it resolves to that worktree (`python -c "import <pkg>; print(<pkg>.__file__)"`).
 
 ## Notes
 

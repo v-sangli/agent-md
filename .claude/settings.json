@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/session_start.sh"
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session_start.sh\""
           }
         ]
       }
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/access_guard.sh"
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/access_guard.sh\""
           }
         ]
       },
@@ -25,7 +25,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/pre_tool_use_bash_guard.sh"
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/pre_tool_use_bash_guard.sh\""
           }
         ]
       }
@@ -36,7 +36,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/post_tool_use_privilege_guard.sh"
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/post_tool_use_privilege_guard.sh\""
           }
         ]
       }
@@ -47,7 +47,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/post_tool_use_privilege_guard.sh"
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/post_tool_use_privilege_guard.sh\""
           }
         ]
       }

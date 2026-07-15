@@ -2,8 +2,16 @@
 set -euo pipefail
 
 ROOT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-ROOT_DIR="$(cd "$ROOT_DIR" && pwd)"
+# Physical path (-P): this workspace is reachable via a symlinked twin
+# (/home/vsangli/workspace -> /data/workspace). Targets are compared after
+# realpath resolution, so the root must be physical too or workspace writes
+# spelled via the other twin would misclassify as external.
+ROOT_DIR="$(cd "$ROOT_DIR" && pwd -P)"
 CONFIG_PATH="$ROOT_DIR/.claude/access.conf"
+
+# Shared tokenizer (is_separator, tokenize_command) + head classification.
+_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$_LIB_DIR/lib/command_scan.sh"
 
 payload="$(cat || true)"
 if [ -z "$payload" ] || ! command -v jq >/dev/null 2>&1; then
@@ -134,15 +142,22 @@ classify_target() {
     -|--|--*) return 0 ;;
   esac
 
-  action_count=$((action_count + 1))
   resolved="$(resolve_path "$raw" || true)"
+
+  # Discarded sinks are no-ops, not real writes: don't count or record them.
+  # (A read-only command carrying `2>/dev/null` must not look like a write.)
+  case "$raw" in
+    /dev/null|/dev/zero|/dev/stdout|/dev/stderr|/dev/tty|/dev/full|/dev/random|/dev/urandom|/dev/fd/*)
+      return 0 ;;
+  esac
+  case "$resolved" in
+    /dev/null|/dev/zero|/dev/stdout|/dev/stderr|/dev/tty|/dev/full|/dev/random|/dev/urandom)
+      return 0 ;;
+  esac
+
+  action_count=$((action_count + 1))
   if [[ "$resolved" == UNKNOWN:* ]]; then
     record_finding ask "$op" "$raw" "$resolved" "dynamic or unresolved path"
-    return 0
-  fi
-
-  if [ "$resolved" = "/dev/null" ]; then
-    record_finding ok "$op" "$raw" "$resolved" "null sink"
     return 0
   fi
 
@@ -198,110 +213,6 @@ classify_target() {
   fi
 
   record_finding "$level" "$op" "$raw" "$resolved" "$note"
-}
-
-is_separator() {
-  case "$1" in
-    ';'|'&&'|'||'|'|'|'('|')') return 0 ;;
-    *) return 1 ;;
-  esac
-}
-
-tokenize_command() {
-  local input="$1" len i ch next token quote escape
-  len="${#input}"
-  token=""
-  quote=""
-  escape=0
-
-  for ((i = 0; i < len; i++)); do
-    ch="${input:i:1}"
-    if [ "$escape" -eq 1 ]; then
-      token+="$ch"
-      escape=0
-      continue
-    fi
-
-    if [ -n "$quote" ]; then
-      if [ "$ch" = "\\" ] && [ "$quote" = '"' ]; then
-        escape=1
-      elif [ "$ch" = "$quote" ]; then
-        quote=""
-      else
-        token+="$ch"
-      fi
-      continue
-    fi
-
-    case "$ch" in
-      "'"|'"') quote="$ch" ;;
-      "\\") escape=1 ;;
-      $' '|$'\t'|$'\r'|$'\n')
-        if [ -n "$token" ]; then
-          printf '%s\n' "$token"
-          token=""
-        fi
-        ;;
-      ';'|'('|')')
-        if [ -n "$token" ]; then
-          printf '%s\n' "$token"
-          token=""
-        fi
-        printf '%s\n' "$ch"
-        ;;
-      '&')
-        next="${input:i+1:1}"
-        if [ "$next" = "&" ]; then
-          if [ -n "$token" ]; then
-            printf '%s\n' "$token"
-            token=""
-          fi
-          printf '&&\n'
-          i=$((i + 1))
-        elif [ "$next" = ">" ]; then
-          if [ -n "$token" ]; then
-            printf '%s\n' "$token"
-            token=""
-          fi
-          printf '&>\n'
-          i=$((i + 1))
-        else
-          token+="$ch"
-        fi
-        ;;
-      '|')
-        next="${input:i+1:1}"
-        if [ -n "$token" ]; then
-          printf '%s\n' "$token"
-          token=""
-        fi
-        if [ "$next" = "|" ]; then
-          printf '||\n'
-          i=$((i + 1))
-        else
-          printf '|\n'
-        fi
-        ;;
-      '>')
-        next="${input:i+1:1}"
-        if [ -n "$token" ]; then
-          printf '%s\n' "$token"
-          token=""
-        fi
-        if [ "$next" = ">" ]; then
-          printf '>>\n'
-          i=$((i + 1))
-        else
-          printf '>\n'
-        fi
-        ;;
-      *) token+="$ch" ;;
-    esac
-  done
-
-  if [ -n "$token" ]; then
-    printf '%s\n' "$token"
-  fi
 }
 
 next_segment_tokens() {

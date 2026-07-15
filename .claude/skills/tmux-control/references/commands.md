@@ -30,6 +30,19 @@ Run these commands from the project root.
   --output .tmux-control/captures/project-work.txt
 ```
 
+## Wait-for
+
+Poll a pane until output matches an ERE (prints the pane tail; exits 1 on
+timeout). Prefer this over hand-rolled `for`/`sleep`/`capture` loops.
+
+```bash
+.claude/skills/tmux-control/scripts/tmux_control.sh wait-for \
+  --target project-work::run \
+  --pattern '[0-9]+ passed|[0-9]+ failed|error' \
+  --timeout 120 \
+  --lines 60
+```
+
 ## Status
 
 ```bash

@@ -9,6 +9,7 @@ Usage:
   tmux_control.sh start --session NAME [--root DIR] [--roles a,b,c] [--replace]
   tmux_control.sh send --target SESSION::ALIAS --command COMMAND [--no-enter]
   tmux_control.sh capture --target SESSION::ALIAS [--lines N] [--join-wrapped] [--output FILE]
+  tmux_control.sh wait-for --target SESSION::ALIAS --pattern ERE [--timeout SECONDS] [--interval SECONDS] [--lines N]
   tmux_control.sh status [--session NAME]
   tmux_control.sh interrupt --target SESSION::ALIAS
   tmux_control.sh root-request --session NAME [--cwd DIR] --command COMMAND
@@ -160,6 +161,38 @@ cmd_capture() {
   fi
 }
 
+cmd_wait_for() {
+  local target="" pattern="" timeout=120 interval=2 lines=60
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --target) target="${2:-}"; shift 2 ;;
+      --pattern) pattern="${2:-}"; shift 2 ;;
+      --timeout) timeout="${2:-120}"; shift 2 ;;
+      --interval) interval="${2:-2}"; shift 2 ;;
+      --lines) lines="${2:-60}"; shift 2 ;;
+      *) die "unknown wait-for option: $1" ;;
+    esac
+  done
+  [ -n "$target" ] || die "wait-for requires --target"
+  [ -n "$pattern" ] || die "wait-for requires --pattern"
+  local pane out waited=0
+  pane="$(resolve_target "$target")"
+  while :; do
+    out="$(tmux capture-pane -p -t "$pane" -S "-$lines")"
+    if printf '%s\n' "$out" | grep -Eq "$pattern"; then
+      printf '%s\n' "$out"
+      return 0
+    fi
+    if [ "$waited" -ge "$timeout" ]; then
+      printf '%s\n' "$out"
+      printf 'tmux-control: wait-for timed out after %ss without matching: %s\n' "$timeout" "$pattern" >&2
+      return 1
+    fi
+    sleep "$interval"
+    waited=$((waited + interval))
+  done
+}
+
 cmd_status() {
   local session=""
   while [ "$#" -gt 0 ]; do
@@ -235,6 +268,7 @@ case "$cmd" in
   start) cmd_start "$@" ;;
   send) cmd_send "$@" ;;
   capture) cmd_capture "$@" ;;
+  wait-for) cmd_wait_for "$@" ;;
   status) cmd_status "$@" ;;
   interrupt) cmd_interrupt "$@" ;;
   root-request) cmd_root_request "$@" ;;

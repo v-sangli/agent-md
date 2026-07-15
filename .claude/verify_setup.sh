@@ -4,6 +4,15 @@ set -euo pipefail
 REPO_DIR="${1:-$(pwd)}"
 REPO_DIR="$(cd "$REPO_DIR" && pwd)"
 
+# Hermetic default-deny config dir. Permission-classification tests point
+# CLAUDE_PROJECT_DIR here so they validate guard LOGIC independent of the
+# machine-local .claude/access.conf grants. (Scripts still load from REPO_DIR.)
+DEFAULT_CFG_DIR="$(mktemp -d)"
+mkdir -p "$DEFAULT_CFG_DIR/.claude"
+printf 'allow_external_write=false\nallow_external_delete=false\nmaintainer_mode=false\n' \
+  >"$DEFAULT_CFG_DIR/.claude/access.conf"
+trap 'rm -rf "$DEFAULT_CFG_DIR"' EXIT
+
 pass_count=0
 fail_count=0
 
@@ -104,6 +113,7 @@ need_file ".claude/policy/OPERATING_SPEC.md"
 need_file ".claude/settings.json"
 need_file ".claude/harness/run.sh"
 need_file ".claude/hooks/access_guard.sh"
+need_file ".claude/hooks/lib/command_scan.sh"
 need_file ".claude/hooks/session_start.sh"
 need_file ".claude/hooks/pre_tool_use_guard.sh"
 need_file ".claude/hooks/pre_tool_use_bash_guard.sh"
@@ -155,11 +165,23 @@ if jq -e '
   ((.permissions.ask // []) | index("Bash(rm -rf:*)") | not) and
   ((.permissions.deny // []) | index("Edit(.claude/**)") | not) and
   ((.permissions.deny // []) | index("Write(.claude/**)") | not) and
-  ([.hooks.PreToolUse[] | select(.matcher == "Bash") | .hooks[].command] | index("bash .claude/hooks/access_guard.sh") | not)
+  ([.hooks.PreToolUse[] | select(.matcher == "Bash") | .hooks[].command] | index("bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/access_guard.sh\"") | not)
 ' "$REPO_DIR/.claude/settings.json" >/dev/null; then
   pass "settings.json routes Bash mutation through harness, not access-guard allow"
 else
   fail "settings.json routes Bash mutation through harness, not access-guard allow"
+fi
+
+# Hook commands must be CWD-independent: a persisted `cd` out of the workspace
+# made relative `bash .claude/hooks/...` registrations fail silently
+# (non-blocking "No such file or directory"), leaving Bash calls unguarded.
+if jq -e '
+  [.hooks | to_entries[] | .value[] | .hooks[] | .command]
+  | (length > 0) and all(startswith("bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/"))
+' "$REPO_DIR/.claude/settings.json" >/dev/null; then
+  pass "settings.json hook commands are CWD-independent via \$CLAUDE_PROJECT_DIR"
+else
+  fail "settings.json hook commands are CWD-independent via \$CLAUDE_PROJECT_DIR"
 fi
 
 standalone_names=""
@@ -223,7 +245,7 @@ fi
 
 env_ok=1
 for required in \
-  "source ~/miniconda3/bin/activate dexpolicy" \
+  "source /data/miniconda3/bin/activate dexpolicy" \
   "python -V" \
   "which python" \
   ".claude/policy/AGENT_RULES.md"; do
@@ -286,12 +308,12 @@ else
 fi
 
 run_expect "access classifier asks for .claude write" 0 bash -lc '
-repo="$1"
+repo="$1"; cfg="$2"
 jq -n --arg path ".claude/settings.json" "{tool_name:\"Write\",tool_input:{file_path:\$path}}" |
-  CLAUDE_PROJECT_DIR="$repo" bash "$repo/.claude/hooks/access_guard.sh" >/tmp/verify_access_claude.out &&
+  CLAUDE_PROJECT_DIR="$cfg" bash "$repo/.claude/hooks/access_guard.sh" >/tmp/verify_access_claude.out &&
   jq -e ".hookSpecificOutput.permissionDecision == \"ask\"" /tmp/verify_access_claude.out >/dev/null &&
   rg -q "CRITICAL.*\\.claude" /tmp/verify_access_claude.out
-' _ "$REPO_DIR"
+' _ "$REPO_DIR" "$DEFAULT_CFG_DIR"
 run_expect "access classifier marks workspace rm-rf as allow" 0 bash -lc '
 repo="$1"
 jq -n --arg cmd "rm -rf build/tmp && rm -rf .cache/foo" "{tool_name:\"Bash\",tool_input:{command:\$cmd}}" |
@@ -299,12 +321,12 @@ jq -n --arg cmd "rm -rf build/tmp && rm -rf .cache/foo" "{tool_name:\"Bash\",too
   jq -e ".hookSpecificOutput.permissionDecision == \"allow\"" /tmp/verify_access_workspace.out >/dev/null
 ' _ "$REPO_DIR"
 run_expect "access classifier asks for mashed external rm-rf" 0 bash -lc '
-repo="$1"
+repo="$1"; cfg="$2"
 jq -n --arg cmd "mkdir -p build && rm -rf build/tmp && rm -rf /opt/foo" "{tool_name:\"Bash\",tool_input:{command:\$cmd}}" |
-  CLAUDE_PROJECT_DIR="$repo" bash "$repo/.claude/hooks/access_guard.sh" >/tmp/verify_access_external.out &&
+  CLAUDE_PROJECT_DIR="$cfg" bash "$repo/.claude/hooks/access_guard.sh" >/tmp/verify_access_external.out &&
   jq -e ".hookSpecificOutput.permissionDecision == \"ask\"" /tmp/verify_access_external.out >/dev/null &&
   rg -q "/opt/foo" /tmp/verify_access_external.out
-' _ "$REPO_DIR"
+' _ "$REPO_DIR" "$DEFAULT_CFG_DIR"
 run_expect "access classifier marks /tmp content cleanup as allow" 0 bash -lc '
 repo="$1"
 jq -n --arg cmd "rm -rf /tmp/claude-test-cache" "{tool_name:\"Bash\",tool_input:{command:\$cmd}}" |
@@ -319,12 +341,12 @@ jq -n --arg cmd "rm -rf /tmp" "{tool_name:\"Bash\",tool_input:{command:\$cmd}}" 
   rg -q "CRITICAL.*tmp" /tmp/verify_access_tmp_root.out
 ' _ "$REPO_DIR"
 run_expect "access classifier asks for external write" 0 bash -lc '
-repo="$1"
+repo="$1"; cfg="$2"
 jq -n --arg path "/opt/foo" "{tool_name:\"Write\",tool_input:{file_path:\$path}}" |
-  CLAUDE_PROJECT_DIR="$repo" bash "$repo/.claude/hooks/access_guard.sh" >/tmp/verify_access_write_external.out &&
+  CLAUDE_PROJECT_DIR="$cfg" bash "$repo/.claude/hooks/access_guard.sh" >/tmp/verify_access_write_external.out &&
   jq -e ".hookSpecificOutput.permissionDecision == \"ask\"" /tmp/verify_access_write_external.out >/dev/null &&
   rg -q "/opt/foo" /tmp/verify_access_write_external.out
-' _ "$REPO_DIR"
+' _ "$REPO_DIR" "$DEFAULT_CFG_DIR"
 run_expect "access classifier asks for dynamic rm target" 0 bash -lc '
 repo="$1"
 jq -n --arg cmd "rm -rf \"\$TARGET\"" "{tool_name:\"Bash\",tool_input:{command:\$cmd}}" |
@@ -333,23 +355,78 @@ jq -n --arg cmd "rm -rf \"\$TARGET\"" "{tool_name:\"Bash\",tool_input:{command:\
   rg -q "dynamic|unresolved" /tmp/verify_access_dynamic.out
 ' _ "$REPO_DIR"
 
-run_expect "pre_tool_use_bash_guard blocks direct workspace rm-rf and routes to harness" 2 bash -lc "set +e; printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rm -rf build/tmp\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' 2>/tmp/verify_direct_rm.err; rc=\$?; set -e; rg -q '.claude/harness/run.sh' /tmp/verify_direct_rm.err; exit \$rc"
-run_expect "pre_tool_use_bash_guard blocks direct sed in-place and routes to harness" 2 bash -lc "set +e; printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"sed -i s/x/y/ file.txt\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' 2>/tmp/verify_direct_sed_i.err; rc=\$?; set -e; rg -q '.claude/harness/run.sh' /tmp/verify_direct_sed_i.err; exit \$rc"
-run_expect "pre_tool_use_bash_guard blocks direct redirection and routes to harness" 2 bash -lc "set +e; printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"cat input.txt > out.txt\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' 2>/tmp/verify_direct_redirect.err; rc=\$?; set -e; rg -q '.claude/harness/run.sh' /tmp/verify_direct_redirect.err; exit \$rc"
+run_expect "pre_tool_use_bash_guard runs workspace rm-rf free (no routing)" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rm -rf build/tmp\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'"
+run_expect "pre_tool_use_bash_guard runs workspace sed in-place free" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"sed -i s/x/y/ file.txt\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'"
+run_expect "pre_tool_use_bash_guard runs workspace redirection free" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"cat input.txt > out.txt\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'"
+run_expect "pre_tool_use_bash_guard asks for external write/delete with grant hint" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rm -rf /opt/foo\"}}' | CLAUDE_PROJECT_DIR='$DEFAULT_CFG_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_external_rm.out && jq -e '.hookSpecificOutput.permissionDecision == \"ask\"' /tmp/verify_external_rm.out >/dev/null && rg -q 'access.conf' /tmp/verify_external_rm.out && rg -q '/opt/foo' /tmp/verify_external_rm.out"
+run_expect "pre_tool_use_bash_guard asks CRITICAL for .claude write" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"echo x > .claude/settings.json\"}}' | CLAUDE_PROJECT_DIR='$DEFAULT_CFG_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_claude_write.out && jq -e '.hookSpecificOutput.permissionDecision == \"ask\"' /tmp/verify_claude_write.out >/dev/null && rg -q 'CRITICAL' /tmp/verify_claude_write.out"
+# Read-only commands must NOT be blocked, even when they contain a discarded
+# redirect or name an interpreter/tool as an argument.
+run_expect "pre_tool_use_bash_guard allows read-only command with discarded redirect" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"ls -la foo 2>/dev/null\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'"
+run_expect "pre_tool_use_bash_guard allows command -v lookup of interpreter" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"command -v bun\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'"
+run_expect "pre_tool_use_bash_guard allows which lookup of interpreter" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"which bun\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'"
+run_expect "pre_tool_use_bash_guard allows interpreter name as grep argument" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"ls | grep npm\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'"
+run_expect "pre_tool_use_bash_guard allows one-shot bash -c print" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"bash -c '\\''echo hi'\\''\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'"
+run_expect "pre_tool_use_bash_guard denies bash -c interpreter toward tmux" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"bash -c '\\''pytest -q'\\''\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_deny_bashc.out && jq -e '.hookSpecificOutput.permissionDecision == \"deny\"' /tmp/verify_deny_bashc.out >/dev/null"
+run_expect "pre_tool_use_bash_guard denies non-first-listed interpreter (ruby)" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"ruby -e puts\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_deny_ruby.out && jq -e '.hookSpecificOutput.permissionDecision == \"deny\"' /tmp/verify_deny_ruby.out >/dev/null"
+run_expect "pre_tool_use_bash_guard handles subshell/separator-terminated read-only command" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"(ls foo)\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'"
+# Single-decider allow/fall-through behavior.
+run_expect "pre_tool_use_bash_guard emits allow for read-only compound" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"ls -la /tmp 2>/dev/null | grep foo && cat /etc/hostname\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_allow_ro.out && jq -e '.hookSpecificOutput.permissionDecision == \"allow\"' /tmp/verify_allow_ro.out >/dev/null"
+run_expect "pre_tool_use_bash_guard emits allow for workspace write" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rm -rf build/tmp\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_allow_ws.out && jq -e '.hookSpecificOutput.permissionDecision == \"allow\"' /tmp/verify_allow_ws.out >/dev/null"
+run_expect "pre_tool_use_bash_guard emits allow for loop over read-only heads" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"for f in a b; do grep -c pattern \$f; done\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_allow_loop.out && jq -e '.hookSpecificOutput.permissionDecision == \"allow\"' /tmp/verify_allow_loop.out >/dev/null"
+run_expect "pre_tool_use_bash_guard emits allow for git -C read-only subcommand" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"git -C sub/dir log --oneline -5 && git -C sub/dir worktree list\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_allow_git.out && jq -e '.hookSpecificOutput.permissionDecision == \"allow\"' /tmp/verify_allow_git.out >/dev/null"
+run_expect "pre_tool_use_bash_guard falls through on git push (native ask rules)" 0 bash -lc "out=\$(printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"git push origin main\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'); [ -z \"\$out\" ]"
+# Unquoted $(...) is segmented: inner heads and write targets are scanned.
+run_expect "pre_tool_use_bash_guard allows unquoted substitution with /tmp rm" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"echo \$(rm -rf /tmp/zzz)\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_subst_tmp.out && jq -e '.hookSpecificOutput.permissionDecision == \"allow\"' /tmp/verify_subst_tmp.out >/dev/null"
+run_expect "pre_tool_use_bash_guard asks on unquoted substitution with external rm" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"echo \$(rm -rf /opt/foo)\"}}' | CLAUDE_PROJECT_DIR='$DEFAULT_CFG_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_subst_ext.out && jq -e '.hookSpecificOutput.permissionDecision == \"ask\"' /tmp/verify_subst_ext.out >/dev/null && rg -q '/opt/foo' /tmp/verify_subst_ext.out"
+# Double-quoted substitution and backticks hide execution from the token scan.
+run_expect "pre_tool_use_bash_guard keeps double-quoted substitution opaque" 0 bash -lc "out=\$(jq -n --arg c 'echo \"\$(rm -rf /opt/foo)\"' '{tool_name:\"Bash\",tool_input:{command:\$c}}' | CLAUDE_PROJECT_DIR='$DEFAULT_CFG_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'); [ -z \"\$out\" ]"
+run_expect "pre_tool_use_bash_guard keeps backticks opaque" 0 bash -lc "out=\$(jq -n --arg c 'echo \`id\`' '{tool_name:\"Bash\",tool_input:{command:\$c}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'); [ -z \"\$out\" ]"
+# Newline and & are command separators (fail-open regression tests).
+run_expect "pre_tool_use_bash_guard asks on multiline external rm" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"ls /tmp\\\\nrm -rf /opt/foo\"}}' | CLAUDE_PROJECT_DIR='$DEFAULT_CFG_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_ml_rm.out && jq -e '.hookSpecificOutput.permissionDecision == \"ask\"' /tmp/verify_ml_rm.out >/dev/null && rg -q '/opt/foo' /tmp/verify_ml_rm.out"
+run_expect "pre_tool_use_bash_guard asks on backgrounded external rm" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"ls & rm -rf /opt/foo\"}}' | CLAUDE_PROJECT_DIR='$DEFAULT_CFG_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_bg_rm.out && jq -e '.hookSpecificOutput.permissionDecision == \"ask\"' /tmp/verify_bg_rm.out >/dev/null && rg -q '/opt/foo' /tmp/verify_bg_rm.out"
+run_expect "pre_tool_use_bash_guard allows commented-out mutation plus read-only line" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"# scratch: rm -rf /opt/foo\\\\nls -la\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_comment.out && jq -e '.hookSpecificOutput.permissionDecision == \"allow\"' /tmp/verify_comment.out >/dev/null"
+run_expect "pre_tool_use_bash_guard allows fd-duplication 2>&1" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"ls /tmp 2>&1 | head -3\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_fddup.out && jq -e '.hookSpecificOutput.permissionDecision == \"allow\"' /tmp/verify_fddup.out >/dev/null"
+# Variable-alias heads (TC=/path/tool.sh ... "$TC" args).
+run_expect "pre_tool_use_bash_guard allows var-alias of sanctioned tmux helper" 0 bash -lc "jq -n --arg c 'TC=$REPO_DIR/.claude/skills/tmux-control/scripts/tmux_control.sh
+\$TC capture --target t::run --lines 5' '{tool_name:\"Bash\",tool_input:{command:\$c}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_alias_tc.out && jq -e '.hookSpecificOutput.permissionDecision == \"allow\"' /tmp/verify_alias_tc.out >/dev/null"
+run_expect "pre_tool_use_bash_guard allows tmux poll loop idiom" 0 bash -lc "jq -n --arg c 'TC=$REPO_DIR/.claude/skills/tmux-control/scripts/tmux_control.sh; for i in \$(seq 1 2); do out=\$(\$TC status 2>/dev/null); echo \$out | grep -q pane && break; sleep 1; done; echo \$out | tail -2' '{tool_name:\"Bash\",tool_input:{command:\$c}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_poll.out && jq -e '.hookSpecificOutput.permissionDecision == \"allow\"' /tmp/verify_poll.out >/dev/null"
+run_expect "pre_tool_use_bash_guard never allows mutator through var alias" 0 bash -lc "out=\$(jq -n --arg c 'R=rm
+\$R -rf /opt/foo' '{tool_name:\"Bash\",tool_input:{command:\$c}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'); [ -z \"\$out\" ]"
+run_expect "pre_tool_use_bash_guard forgets alias on dynamic reassignment" 0 bash -lc "out=\$(jq -n --arg c 'R=ls
+R=\$HOME/x
+\$R /opt' '{tool_name:\"Bash\",tool_input:{command:\$c}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'); [ -z \"\$out\" ]"
+run_expect "tmux-control wait-for validates required options" 2 bash -lc "'$REPO_DIR/.claude/skills/tmux-control/scripts/tmux_control.sh' wait-for --pattern x"
+# Read-only interpreter probes run inline; real interpreter work stays on tmux.
+run_expect "pre_tool_use_bash_guard allows python version probe" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"python -V\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_pyver.out && jq -e '.hookSpecificOutput.permissionDecision == \"allow\"' /tmp/verify_pyver.out >/dev/null"
+run_expect "pre_tool_use_bash_guard allows python import probe" 0 bash -lc "jq -n --arg c 'python -c \"import dexdata_rs\"' '{tool_name:\"Bash\",tool_input:{command:\$c}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_pyimp.out && jq -e '.hookSpecificOutput.permissionDecision == \"allow\"' /tmp/verify_pyimp.out >/dev/null"
+run_expect "pre_tool_use_bash_guard allows python prefix probe" 0 bash -lc "jq -n --arg c 'python3 -c \"import sys; print(sys.prefix)\"' '{tool_name:\"Bash\",tool_input:{command:\$c}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_pypfx.out && jq -e '.hookSpecificOutput.permissionDecision == \"allow\"' /tmp/verify_pypfx.out >/dev/null"
+run_expect "pre_tool_use_bash_guard allows any python -c one-liner" 0 bash -lc "jq -n --arg c 'python -c \"import sys; print(1, sys.prefix)\"' '{tool_name:\"Bash\",tool_input:{command:\$c}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_pyone.out && jq -e '.hookSpecificOutput.permissionDecision == \"allow\"' /tmp/verify_pyone.out >/dev/null"
+run_expect "pre_tool_use_bash_guard denies python script execution" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"python bench.py\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_pyscript.out && jq -e '.hookSpecificOutput.permissionDecision == \"deny\"' /tmp/verify_pyscript.out >/dev/null"
+run_expect "pre_tool_use_bash_guard denies python -m module runs" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"python -m pytest -q\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_pymod.out && jq -e '.hookSpecificOutput.permissionDecision == \"deny\"' /tmp/verify_pymod.out >/dev/null"
+run_expect "pre_tool_use_bash_guard allows pip show query" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"pip show dexdata | grep -iE Location\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_pipshow.out && jq -e '.hookSpecificOutput.permissionDecision == \"allow\"' /tmp/verify_pipshow.out >/dev/null"
+run_expect "pre_tool_use_bash_guard allows abs-path pip list" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"/data/miniconda3/envs/dexpolicy/bin/pip list 2>/dev/null | head -5\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_piplist.out && jq -e '.hookSpecificOutput.permissionDecision == \"allow\"' /tmp/verify_piplist.out >/dev/null"
+run_expect "pre_tool_use_bash_guard denies pip download" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"pip download requests\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_pipdl.out && jq -e '.hookSpecificOutput.permissionDecision == \"deny\"' /tmp/verify_pipdl.out >/dev/null"
+run_expect "pre_tool_use_bash_guard denies maturin toward tmux" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"maturin develop --release\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_maturin.out && jq -e '.hookSpecificOutput.permissionDecision == \"deny\"' /tmp/verify_maturin.out >/dev/null"
+run_expect "pre_tool_use_bash_guard allows source-activate env probe chain" 0 bash -lc "jq -n --arg c 'source ~/miniconda3/bin/activate dexpolicy && python -V && python -c \"import sys; print(sys.prefix)\"' '{tool_name:\"Bash\",tool_input:{command:\$c}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_srcact.out && jq -e '.hookSpecificOutput.permissionDecision == \"allow\"' /tmp/verify_srcact.out >/dev/null"
+run_expect "pre_tool_use_bash_guard keeps generic source opaque" 0 bash -lc "out=\$(printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"source setup_env.sh\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'); [ -z \"\$out\" ]"
+run_expect "pre_tool_use_bash_guard falls through on unknown head" 0 bash -lc "out=\$(printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"sometool --flag arg\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'); [ -z \"\$out\" ]"
 run_expect "harness runner executes workspace rm-rf" 0 bash -lc "cd '$REPO_DIR' && rm -rf .verify-harness && mkdir -p .verify-harness/child && .claude/harness/run.sh -- 'rm -rf .verify-harness/child' && test ! -e .verify-harness/child && rm -rf .verify-harness"
 run_expect "harness runner executes safe /tmp cleanup" 0 bash -lc "mkdir -p /tmp/claude-harness-verify && '$REPO_DIR/.claude/harness/run.sh' -- 'rm -rf /tmp/claude-harness-verify' && test ! -e /tmp/claude-harness-verify"
 run_expect "harness runner asks for external delete without running" 3 bash -lc "cd '$REPO_DIR'; set +e; .claude/harness/run.sh -- 'rm -rf /opt/claude-harness-test' 2>/tmp/verify_harness_external.err; rc=\$?; set -e; rg -q 'Approval required' /tmp/verify_harness_external.err; exit \$rc"
 run_expect "harness runner treats critical delete as non-running request" 4 bash -lc "cd '$REPO_DIR'; set +e; .claude/harness/run.sh -- 'rm -rf /tmp' 2>/tmp/verify_harness_critical.err; rc=\$?; set -e; rg -q 'Critical approval required' /tmp/verify_harness_critical.err; exit \$rc"
 run_expect "harness runner asks for dynamic target without running" 3 bash -lc "cd '$REPO_DIR'; set +e; .claude/harness/run.sh -- 'rm -rf \"\$TARGET\"' 2>/tmp/verify_harness_dynamic.err; rc=\$?; set -e; rg -q 'dynamic|unresolved' /tmp/verify_harness_dynamic.err; exit \$rc"
 
-run_expect "pre_tool_use_bash_guard blocks pip install" 2 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"pip install requests\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'"
-run_expect "pre_tool_use_bash_guard blocks compound install after rm-rf" 2 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rm -rf build && pip install requests\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'"
-run_expect "pre_tool_use_bash_guard redirects sudo" 2 bash -lc "set +e; printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"sudo true\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' 2>/tmp/verify_sudo_redirect.err; rc=\$?; set -e; rg -q 'root-request' /tmp/verify_sudo_redirect.err; exit \$rc"
-run_expect "pre_tool_use_bash_guard blocks direct pytest" 2 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"pytest -q\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'"
+run_expect "pre_tool_use_bash_guard denies pip install toward tmux" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"pip install requests\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_deny_pip.out && jq -e '.hookSpecificOutput.permissionDecision == \"deny\"' /tmp/verify_deny_pip.out >/dev/null && rg -q 'tmux-control' /tmp/verify_deny_pip.out"
+run_expect "pre_tool_use_bash_guard denies compound install after rm-rf" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"rm -rf build && pip install requests\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_deny_compound.out && jq -e '.hookSpecificOutput.permissionDecision == \"deny\"' /tmp/verify_deny_compound.out >/dev/null"
+run_expect "pre_tool_use_bash_guard denies sudo toward root-request" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"sudo true\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_sudo_redirect.out && jq -e '.hookSpecificOutput.permissionDecision == \"deny\"' /tmp/verify_sudo_redirect.out >/dev/null && rg -q 'root-request' /tmp/verify_sudo_redirect.out"
+run_expect "pre_tool_use_bash_guard denies direct pytest toward tmux" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"pytest -q\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh' >/tmp/verify_deny_pytest.out && jq -e '.hookSpecificOutput.permissionDecision == \"deny\"' /tmp/verify_deny_pytest.out >/dev/null"
 run_expect "pre_tool_use_bash_guard allows tmux-control helper" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\".claude/skills/tmux-control/scripts/tmux_control.sh send --target smoke::run --command '\\''pytest -q'\\''\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'"
 run_expect "pre_tool_use_bash_guard allows root-request with sudo argument" 0 bash -lc "printf '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\".claude/skills/tmux-control/scripts/tmux_control.sh root-request --session root-verify --cwd . --command '\\''sudo true'\\''\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/pre_tool_use_bash_guard.sh'"
 run_expect "tmux-control root request only offers root tmux" 0 bash -lc "cd '$REPO_DIR' && .claude/skills/tmux-control/scripts/tmux_control.sh root-request --session root-verify --cwd '$REPO_DIR' --command 'sudo true' >/tmp/verify_root_request.out && rg -q 'approve a visible root tmux session' /tmp/verify_root_request.out && rg -q 'real terminal' /tmp/verify_root_request.out && ! rg -q 'Option 1|paste the output|in-session ! sudo.*alternative' /tmp/verify_root_request.out"
 run_expect "post_tool_use_privilege_guard injects root guidance" 0 bash -lc "printf '{\"hook_event_name\":\"PostToolUseFailure\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"dmesg | tail\"},\"error\":\"dmesg: read kernel buffer failed: Operation not permitted\"}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/post_tool_use_privilege_guard.sh' >/tmp/verify_privilege_hook.out && jq -e . /tmp/verify_privilege_hook.out >/dev/null && rg -q 'root-request' /tmp/verify_privilege_hook.out && rg -q 'true equivalent' /tmp/verify_privilege_hook.out && rg -q 'Do not suggest in-session' /tmp/verify_privilege_hook.out"
+run_expect "post_tool_use_privilege_guard ignores privilege words in stdout" 0 bash -lc "out=\$(printf '{\"hook_event_name\":\"PostToolUse\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"cat notes.txt\"},\"tool_response\":{\"stdout\":\"docs say: Operation not permitted means EPERM\",\"stderr\":\"\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/post_tool_use_privilege_guard.sh'); [ -z \"\$out\" ]"
+run_expect "post_tool_use_privilege_guard fires on stderr denial" 0 bash -lc "printf '{\"hook_event_name\":\"PostToolUse\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"cat /root/x\"},\"tool_response\":{\"stdout\":\"\",\"stderr\":\"cat: /root/x: Permission denied\"}}' | CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/post_tool_use_privilege_guard.sh' >/tmp/verify_priv_stderr.out && jq -e . /tmp/verify_priv_stderr.out >/dev/null && rg -q 'root-request' /tmp/verify_priv_stderr.out"
 
 printf '\nSUMMARY | PASS=%d FAIL=%d\n' "$pass_count" "$fail_count"
 if [ "$fail_count" -ne 0 ]; then
