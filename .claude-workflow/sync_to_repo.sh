@@ -22,10 +22,14 @@ done
 [ -d "$REPO_DIR/.git" ] || { printf 'sync_to_repo: %s is not a git repo\n' "$REPO_DIR" >&2; exit 2; }
 
 # Machine-local: never sync (repo keeps its committed safe defaults).
+# access.conf is not listed: it was deleted with the 3.0 guards, so the sync
+# should propagate its removal rather than preserve a repo copy.
 EXCLUDES=(
   --exclude 'spec_hashes.json'
   --exclude 'settings.local.json'
-  --exclude 'access.conf'
+  --exclude 'scheduled_tasks.lock'
+  --exclude '*.tmp.*'
+  --exclude '.tmux-control/'
   --exclude '__pycache__/'
   --exclude '*.pyc'
 )

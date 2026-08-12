@@ -1,77 +1,88 @@
 # Claude Operating Specification
 
-Version: 2.1
-Scope: Current lean Claude Code workspace/harness in this repository.
+Version: 3.0
+Scope: Current advisory Claude Code workspace/harness in this repository.
 
 `AGENT_RULES.md` is the canonical rule source. This file explains how the
 workspace is structured, why the rules exist, and how to verify the setup. If a
 short rule and this document drift, update both deliberately instead of treating
 this file as an additional rule layer.
 
+## 0. The 3.0 Rollback
+
+Versions up to 2.1 enforced the contract with blocking PreToolUse/PostToolUse
+hooks (`access_guard.sh`, `pre_tool_use_bash_guard.sh`,
+`post_tool_use_privilege_guard.sh`) and a shell-write executor
+(`.claude/harness/run.sh`). That model was retired on 2026-07-26:
+
+- Hook commands were registered with relative paths and run in the session's
+  current working directory. When the persistent shell cwd drifted out of the
+  workspace, every hook failed non-blocking — enforcement silently vanished
+  while tools kept running.
+- Working around it accumulated machine-specific absolute paths in
+  `settings.json` and permission rules, which defeated portability.
+- The prompt/block friction outweighed the protection: the model's actual
+  failure modes were path/cwd bugs, not destructive intent.
+
+The replacement model is advisory: `AGENT_RULES.md` states conventions, the
+`tmux-control` skill remains the encouraged route for visible/long-running
+work, and Claude Code's native permission `ask` list covers the few genuinely
+dangerous operations (git push, hard reset, sudo). No tool calls are blocked.
+
 ## 1. File Roles
 
 ```text
 CLAUDE.md                         always-loaded orientation and style
-.claude/policy/AGENT_RULES.md     concise canonical runtime contract
+.claude/policy/AGENT_RULES.md     concise canonical runtime contract (advisory)
 .claude/policy/OPERATING_SPEC.md  rationale, design notes, acceptance criteria
 .claude/ENV.md                    environment identity and activation commands
-.claude/settings.json             Claude Code hook/permission registration
-.claude/hooks/                    enforcement and redirect messages
-.claude/harness/run.sh            shell write/delete executor
-.claude/access.conf               local access grants
+.claude/settings.json             SessionStart hook + broad permission grants
+.claude/hooks/session_start.sh    state reinjection at session start
 .claude/skills/tmux-control/      visible shell/root workflow helper
 .claude/skills/dx/                vendored Claude Code Tips plugin
 .claude/skills/superpowers/       vendored Superpowers plugin
 ```
 
-Policy hash drift blocking is not active unless explicitly reintroduced and
-documented in `HARNESS_CHECKLIST.md`.
+Deleted on 2026-08-12: `.claude/hooks/access_guard.sh`,
+`.claude/hooks/pre_tool_use_guard.sh`, `.claude/hooks/pre_tool_use_bash_guard.sh`,
+`.claude/hooks/post_tool_use_privilege_guard.sh`, `.claude/harness/run.sh`,
+`.claude/access.conf`. They had been unregistered since the rollback; the
+rationale above is the record, and `verify_setup.sh` asserts their absence.
 
 ## 2. Access Model
 
-Normal repository files are the default working area. `.claude/**` is protected
-configuration, but can be edited during explicit harness maintenance like this
-current setup work.
+Normal repository files are the default working area. Writes and deletes stay
+inside the workspace by convention; external scope needs the user's go-ahead in
+conversation, not a config grant. `.claude/**` is setup configuration — edited
+during harness maintenance, left alone during ordinary tasks.
 
-The active access path is:
-
-1. Claude attempts a Bash write/delete.
-2. `.claude/hooks/pre_tool_use_bash_guard.sh` blocks direct mutation and points
-   to `.claude/harness/run.sh`.
-3. `.claude/harness/run.sh` asks `.claude/hooks/access_guard.sh` to classify
-   every target.
-4. Workspace and safe `/tmp` content writes/deletes run; external targets ask;
-   critical targets do not run.
-5. `.claude/access.conf` can grant external write/delete roots or protected
-   `.claude/**` maintainer mode.
-
-Native `Edit`, `Write`, and `MultiEdit` tools cannot be script-executed by the
-harness, so hooks classify and prompt/block them directly.
+Claude Code native permissions carry the remaining hard edges: `git push`,
+`git reset --hard`, and `sudo` sit on the `ask` list; everything else is
+allowed. Keep permission rules relative or tool-level — no machine-specific
+absolute paths in `settings.json`.
 
 ## 3. Shell And Tmux Routing
 
-Direct Bash is kept for short read-only inspection because it is fast and easy
-to audit. Anything with progress, prompts, credentials, installation, tests, or
-long runtime moves to `tmux-control`, where the user can attach and observe.
+Direct Bash is allowed for everything. `tmux-control` stays the recommended
+route for anything with progress, prompts, credentials, installation, tests, or
+long runtime, because the user can attach, observe, and interrupt, and the
+durable capture log survives the session. This is a recommendation on grounds
+of transparency, not a gate.
 
-This is intentionally a routing rule, not a claim that every test is dangerous.
-The current harness chooses transparency over convenience for direct test/build
-commands. Revisit this in `HARNESS_CHECKLIST.md` if short direct tests should be
-allowed later.
+Practical cwd rule: the persistent shell's cwd drifts across Bash calls. Invoke
+helper scripts by absolute path or prefix with `cd` to the workspace root.
 
 ## 4. Privilege Boundary
 
-The sudo/root rule exists because Claude Code's opaque shell cannot reliably
+The sudo guidance exists because Claude Code's opaque shell cannot reliably
 surface password prompts. The desired behavior is:
 
 1. disclose that elevated privilege appears to be the direct path;
 2. provide any cheap no-root information that is genuinely equivalent or useful;
 3. avoid building on a partial workaround;
 4. request a visible root tmux session through `tmux-control` when privilege is
-   necessary.
-
-The hook and skill messages are operational copies of this route. They should
-stay short and should point back to the canonical rule when possible.
+   necessary, or let the native `sudo` ask-prompt cover short commands when the
+   user is present.
 
 ## 5. Environment Boundary
 
@@ -117,15 +128,15 @@ Setup is considered correct when all are true:
 1. `bash .claude/verify_setup.sh` passes.
 2. `CLAUDE.md` points to the policy and environment sources instead of
    restating every hard rule.
-3. `AGENT_RULES.md` is the only concise canonical runtime contract.
+3. `AGENT_RULES.md` is the only concise canonical runtime contract, and it is
+   advisory — no blocking hooks are registered.
 4. `OPERATING_SPEC.md` explains design/rationale without becoming a second
    stronger rule layer.
-5. Direct Bash writes/deletes route to `.claude/harness/run.sh`.
-6. External writes/deletes ask unless granted in `.claude/access.conf`.
-7. Critical destructive requests stop without running.
-8. Direct sudo and in-session sudo suggestions route to root tmux request flow.
-9. Direct tests/installs/builds/benchmarks route to `tmux-control`.
-10. Environment details live in `.claude/ENV.md`.
+5. `settings.json` registers only the SessionStart hook, allows tools broadly,
+   and contains no machine-specific absolute paths.
+6. `git push`, `git reset --hard`, and `sudo` remain on the permissions `ask`
+   list.
+7. Environment details live in `.claude/ENV.md`.
 
 ## 10. Maintenance Procedure
 

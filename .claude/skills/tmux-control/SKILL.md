@@ -1,6 +1,6 @@
 ---
 name: tmux-control
-description: Run shell work through visible persistent tmux sessions. Use when Claude needs to run benchmarks, tests, installs, builds, migrations, long-running jobs, nested Claude/agent sessions, interactive debuggers, commands requiring live observation/interruption, or any command involving sudo, credentials, passwords, or root-terminal prompts.
+description: Run shell work through visible persistent tmux sessions. Use when Codex needs to run benchmarks, tests, installs, builds, migrations, long-running jobs, nested Claude/agent sessions, interactive debuggers, commands requiring live observation/interruption, or any command involving sudo, credentials, passwords, or root-terminal prompts.
 ---
 
 # Tmux Control
@@ -21,25 +21,9 @@ Use the bundled helper:
 
 ```bash
 .claude/skills/tmux-control/scripts/tmux_control.sh start --session <name> --root "$PWD" --roles run,logs --replace
-.claude/skills/tmux-control/scripts/tmux_control.sh run --target <name>::run --command '<command>' --label <label> --timeout 600
+.claude/skills/tmux-control/scripts/tmux_control.sh send --target <name>::run --command '<command>'
+.claude/skills/tmux-control/scripts/tmux_control.sh capture --target <name>::run --lines 200
 ```
-
-`run` is the default workhorse: one call does send + completion-wait + scoped
-capture + exit code (no sleep-guessing, no stale scrollback). Reach for the
-lower-level `send`/`capture`/`wait-for` when driving interactive processes or
-watching an already-running command.
-
-Usage notes:
-
-- Multi-line payload: write it to a file, then `run --command - < file` — no
-  quoting layer, and the payload is preserved under `.tmux-control/runs/`.
-- On rc=124 the payload keeps running in the pane; resume with the exact
-  `wait-for ... DONE_<id>` line the timeout message prints. Never match
-  generic markers like `ec=0===` — stale scrollback makes them a footgun.
-- From a worktree or nested cwd, invoke the helper by absolute workspace path
-  (AGENT_RULES §2): alias state resolves relative to cwd, and a wrong-cwd
-  state dir reads stale pane ids (the helper now falls back to live
-  pane-title lookup and names the aliases file it read, but don't rely on it).
 
 Read [references/commands.md](references/commands.md) for command examples.
 

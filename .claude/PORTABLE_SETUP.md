@@ -70,14 +70,10 @@ This checks:
 - `tmux-control` is installed in `.claude/skills/tmux-control/`
 - Claude Code Tips is installed as `.claude/skills/dx/`, preserving its plugin namespace and repo glue files.
 - Superpowers is installed as `.claude/skills/superpowers/`, preserving its plugin namespace and repo glue files.
-- settings schema has `hooks.{SessionStart,PreToolUse}`
+- settings.json is advisory: `SessionStart` only, no blocking hooks, no machine-specific absolute paths
 - session bootstrap works
-- direct Bash write/delete commands are blocked and routed to `.claude/harness/run.sh`
-- the harness runner executes workspace-scoped and safe `/tmp` cleanup
-- the harness runner stops and asks for external writes/deletes
-- critical harness requests are surfaced with context and do not run
-- direct `sudo` redirects to the root-request flow
-- direct test/install/benchmark commands are blocked unless routed through the tmux-control helper
+- the retired blocking guards and harness runner are absent
+- `root-request` offers only a visible root tmux session and never runs `sudo` itself
 
 ## 5) Verify live Claude integration
 
@@ -109,5 +105,5 @@ Inside Claude Code:
 
 - `.claude` contains project settings, hooks, project skills, and vendored project-scope plugins.
 - `.claude/policy/` contains the current lean runtime rules and operating specification. It intentionally does not restore the old `.claude-log`, `.claude-tools`, or hash-drift runtime.
-- `.claude/ENV.md` contains the default Python environment contract. On a new machine, either create the named `dexpolicy` conda environment or update that file and `CLAUDE.md` together.
+- `.claude/ENV.md` contains the default Python environment contract, and is the one file expected to be machine-specific. On a new machine, rewrite it to name that machine's activation script and environment; everything else in `.claude/` is meant to be portable as-is.
 - `.claude-log` and `.claude-tools` are intentionally not part of this lean setup.

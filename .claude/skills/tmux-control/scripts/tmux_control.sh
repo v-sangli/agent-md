@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-state_dir="${TMUX_CONTROL_STATE_DIR:-.tmux-control}"
-# Absolutize: runfiles are sourced inside the pane, whose cwd is the session
-# root, not the caller's — a relative runfile path breaks there. pwd -P so the
-# twin spellings of the workspace (/home symlink vs /data) share one state dir.
+# Anchor the state dir to the workspace, not the caller's cwd: the persistent
+# shell cwd drifts between calls, so a relative default made `capture` look for
+# the alias file somewhere `start` never wrote it ("no aliases recorded").
+# pwd -P fallback so the twin spellings of a path share one state dir.
+state_dir="${TMUX_CONTROL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd -P)}/.tmux-control}"
 case "$state_dir" in /*) ;; *) state_dir="$(pwd -P)/$state_dir" ;; esac
 
 usage() {
@@ -12,10 +13,9 @@ usage() {
 Usage:
   tmux_control.sh start --session NAME [--root DIR] [--roles a,b,c] [--replace]
   tmux_control.sh send --target SESSION::ALIAS --command COMMAND [--no-enter]
-  tmux_control.sh run --target SESSION::ALIAS --command COMMAND|- [--timeout SECONDS] [--interval SECONDS] [--label LABEL] [--tail N] [--scrollback N]
   tmux_control.sh capture --target SESSION::ALIAS [--lines N] [--join-wrapped] [--output FILE]
-  tmux_control.sh wait-for --target SESSION::ALIAS (--pattern ERE | --run-id ID) [--timeout SECONDS] [--interval SECONDS] [--lines N]
   tmux_control.sh status [--session NAME]
+  tmux_control.sh wait (--target SESSION::ALIAS | --log FILE) --pattern REGEX [--timeout SECS] [--interval SECS]
   tmux_control.sh interrupt --target SESSION::ALIAS
   tmux_control.sh root-request --session NAME [--cwd DIR] --command COMMAND
 EOF
@@ -49,37 +49,14 @@ resolve_target() {
 
   local session="${target%%::*}"
   local alias="${target#*::}"
-  local file pane
+  local file
   file="$(alias_file "$session")"
-  pane=""
-  if [ -f "$file" ]; then
-    pane="$(awk -F= -v key="$alias" '$1 == key { print $2; found=1 } END { exit found ? 0 : 1 }' "$file" || true)"
-  fi
+  [ -f "$file" ] || die "no aliases recorded for session '$session'"
 
-  # Validate the recorded pane is alive; a wrong-cwd state dir or a replaced
-  # session leaves stale ids behind ("can't find pane: %NN" with no hint).
-  if [ -n "$pane" ] && tmux list-panes -s -t "$session" -F '#{pane_id}' 2>/dev/null | grep -qx "$pane"; then
-    printf '%s\n' "$pane"
-    return
-  fi
-
-  # Fallback: resolve live by pane title (start sets titles to role names).
-  local live
-  live="$(tmux list-panes -s -t "$session" -F '#{pane_id} #{pane_title}' 2>/dev/null |
-    awk -v a="$alias" '{ t=$2; for (i=3; i<=NF; i++) t=t" "$i; if (t == a) { print $1; exit } }')"
-  if [ -n "$live" ]; then
-    # Self-heal: rewrite the stale entry so the next call takes the silent
-    # fast path. The note then fires exactly once per genuine drift.
-    if [ -f "$file" ]; then
-      awk -F= -v key="$alias" '$1 != key' "$file" >"$file.tmp" && mv "$file.tmp" "$file"
-    fi
-    save_alias "$session" "$alias" "$live"
-    printf 'tmux-control: note: recorded pane for %s was stale or missing (aliases file: %s); resolved live by pane title and healed the entry\n' "$target" "$file" >&2
-    printf '%s\n' "$live"
-    return
-  fi
-
-  die "cannot resolve '$alias' in session '$session' (aliases file: $file; live pane-title lookup also failed — check cwd/state dir and tmux session)"
+  local pane
+  pane="$(awk -F= -v key="$alias" '$1 == key { print $2; found=1 } END { exit found ? 0 : 1 }' "$file")" \
+    || die "unknown alias '$alias' for session '$session'"
+  printf '%s\n' "$pane"
 }
 
 send_keys() {
@@ -189,117 +166,42 @@ cmd_capture() {
   fi
 }
 
-cmd_wait_for() {
-  local target="" pattern="" run_id="" timeout=120 interval=2 lines=60
+cmd_wait() {
+  local target="" pattern="" log="" timeout=1800 interval=10
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --target) target="${2:-}"; shift 2 ;;
       --pattern) pattern="${2:-}"; shift 2 ;;
-      --run-id) run_id="${2:-}"; shift 2 ;;
-      --timeout) timeout="${2:-120}"; shift 2 ;;
-      --interval) interval="${2:-2}"; shift 2 ;;
-      --lines) lines="${2:-60}"; shift 2 ;;
-      *) die "unknown wait-for option: $1" ;;
+      --log) log="${2:-}"; shift 2 ;;
+      --timeout) timeout="${2:-1800}"; shift 2 ;;
+      --interval) interval="${2:-10}"; shift 2 ;;
+      *) die "unknown wait option: $1" ;;
     esac
   done
-  [ -n "$target" ] || die "wait-for requires --target"
-  if [ -n "$run_id" ]; then
-    [ -z "$pattern" ] || die "wait-for takes --pattern or --run-id, not both"
-    # Anchored completion marker for a specific run: immune to echoed text
-    # and stale scrollback, unlike a user-supplied pattern.
-    pattern="^===TC_RUN_DONE_${run_id} ec="
-  fi
-  [ -n "$pattern" ] || die "wait-for requires --pattern or --run-id"
-  local pane out waited=0
-  pane="$(resolve_target "$target")"
+  [ -n "$pattern" ] || die "wait requires --pattern"
+  [ -n "$target" ] || [ -n "$log" ] || die "wait requires --target or --log"
+
+  local deadline matched="" pane
+  deadline=$(( $(date +%s) + timeout ))
   while :; do
-    out="$(tmux capture-pane -p -t "$pane" -S "-$lines")"
-    if printf '%s\n' "$out" | grep -Eq "$pattern"; then
-      printf '%s\n' "$out"
+    matched=""
+    if [ -n "$log" ] && [ -f "$log" ]; then
+      matched="$(grep -E -m1 "$pattern" "$log" || true)"
+    fi
+    if [ -z "$matched" ] && [ -n "$target" ]; then
+      pane="$(resolve_target "$target")"
+      matched="$(tmux capture-pane -p -t "$pane" -S -200 | grep -E -m1 "$pattern" || true)"
+    fi
+    if [ -n "$matched" ]; then
+      printf 'wait: matched: %s\n' "$matched"
       return 0
     fi
-    if [ "$waited" -ge "$timeout" ]; then
-      printf '%s\n' "$out"
-      printf 'tmux-control: wait-for timed out after %ss without matching: %s\n' "$timeout" "$pattern" >&2
+    if [ "$(date +%s)" -ge "$deadline" ]; then
+      printf 'wait: timeout after %ss without match of %s\n' "$timeout" "$pattern" >&2
       return 1
     fi
     sleep "$interval"
-    waited=$((waited + interval))
   done
-}
-
-# run: send + wait-for-completion + scoped capture + exit-code file, one call.
-# Replaces the send/sleep-guess/capture and hand-rolled sentinel-poll patterns.
-# The payload is written to a runfile and *sourced* in the pane shell, so env
-# changes made by the payload (e.g. conda activate) persist for later runs.
-# Multi-line payloads are fine: pass --command - and pipe them on stdin.
-# Exit code: the payload's own (last command), or 124 on timeout.
-cmd_run() {
-  local target="" command="" timeout=300 interval=2 label="" tail_n=40 scrollback=5000
-  while [ "$#" -gt 0 ]; do
-    case "$1" in
-      --target) target="${2:-}"; shift 2 ;;
-      --command) command="${2:-}"; shift 2 ;;
-      --timeout) timeout="${2:-300}"; shift 2 ;;
-      --interval) interval="${2:-2}"; shift 2 ;;
-      --label) label="${2:-}"; shift 2 ;;
-      --tail) tail_n="${2:-40}"; shift 2 ;;
-      --scrollback) scrollback="${2:-5000}"; shift 2 ;;
-      *) die "unknown run option: $1" ;;
-    esac
-  done
-  [ -n "$target" ] || die "run requires --target"
-  [ -n "$command" ] || die "run requires --command (use '-' to read stdin)"
-  if [ "$command" = "-" ]; then
-    command="$(cat)"
-    [ -n "$command" ] || die "run: empty command on stdin"
-  fi
-  [ -n "$label" ] || label="$(printf '%s' "$command" | head -n1 | awk '{print $1}')"
-  label="$(sanitize "${label:-run}")"
-
-  local pane id ts run_dir cap_dir runfile logfile ecfile
-  pane="$(resolve_target "$target")"
-  ts="$(date +%Y%m%dT%H%M%S)"
-  id="${ts}_$$"
-  run_dir="$state_dir/runs"
-  cap_dir="$state_dir/captures"
-  mkdir -p "$run_dir" "$cap_dir"
-  runfile="$run_dir/$id-$label.sh"
-  logfile="$cap_dir/$ts-$label.log"
-  ecfile="$cap_dir/$ts-$label.ec"
-  printf '%s\n' "$command" >"$runfile"
-
-  # BEGIN/DONE markers bracket exactly this run's output. The typed line
-  # splits each marker across two quoted strings so the echoed command line
-  # can never match the anchored patterns below.
-  local begin="===TC_RUN_BEGIN_$id===" done_pat="===TC_RUN_DONE_$id"
-  send_keys "$pane" "printf '===TC_RUN_''BEGIN_$id===\\n'; . $(printf '%q' "$runfile"); printf '===TC_RUN_''DONE_$id ec=%d===\\n' \"\$?\""
-
-  local waited=0 out slice ec=""
-  while :; do
-    out="$(tmux capture-pane -p -t "$pane" -S "-$scrollback")"
-    ec="$(printf '%s\n' "$out" | grep -E "^${done_pat} ec=[0-9]+===\$" | tail -n1 | sed -E 's/.* ec=([0-9]+)===$/\1/')" || true
-    [ -n "$ec" ] && break
-    if [ "$waited" -ge "$timeout" ]; then
-      slice="$(printf '%s\n' "$out" | awk -v b="^${begin}\$" 'found { print } $0 ~ b { found=1 }')"
-      printf '%s\n' "$slice" >"$logfile"
-      printf 'timeout\n' >"$ecfile"
-      printf 'tmux-control: run timed out after %ss (command still in pane)\n' "$timeout" >&2
-      printf 'tmux-control: resume: %s wait-for --target %s --run-id %s --timeout 600\n' "${BASH_SOURCE[0]}" "$target" "$id" >&2
-      printf 'exit=timeout capture=%s\n' "$logfile"
-      printf '%s\n' "$slice" | tail -n "$tail_n"
-      return 124
-    fi
-    sleep "$interval"
-    waited=$((waited + interval))
-  done
-
-  slice="$(printf '%s\n' "$out" | awk -v b="^${begin}\$" -v d="^${done_pat} " '$0 ~ d { exit } found { print } $0 ~ b { found=1 }')"
-  printf '%s\n' "$slice" >"$logfile"
-  printf '%s\n' "$ec" >"$ecfile"
-  printf 'exit=%s capture=%s\n' "$ec" "$logfile"
-  printf '%s\n' "$slice" | tail -n "$tail_n"
-  return "$ec"
 }
 
 cmd_status() {
@@ -376,10 +278,9 @@ shift
 case "$cmd" in
   start) cmd_start "$@" ;;
   send) cmd_send "$@" ;;
-  run) cmd_run "$@" ;;
   capture) cmd_capture "$@" ;;
-  wait-for) cmd_wait_for "$@" ;;
   status) cmd_status "$@" ;;
+  wait) cmd_wait "$@" ;;
   interrupt) cmd_interrupt "$@" ;;
   root-request) cmd_root_request "$@" ;;
   -h|--help|help) usage ;;

@@ -20,38 +20,6 @@ Run these commands from the project root.
   --command 'pytest -q'
 ```
 
-## Run
-
-Send + wait-for-completion + scoped capture + exit code, in one call. Prefer
-this over `send`/sleep/`capture` and over hand-rolled sentinel poll loops.
-Output is sliced to exactly this run (no stale scrollback), auto-captured to
-`.tmux-control/captures/<ts>-<label>.log` with the exit code in the matching
-`.ec` file, and the command's exit code becomes `run`'s own (124 on timeout).
-The payload is sourced in the pane shell, so `conda activate` etc. persists.
-
-```bash
-.claude/skills/tmux-control/scripts/tmux_control.sh run \
-  --target project-work::run \
-  --command 'pytest -q' \
-  --label pytest-core \
-  --timeout 600 \
-  --tail 60
-```
-
-Multi-line payloads: pass `--command -` and pipe the script on stdin (avoids
-one whole layer of quoting):
-
-```bash
-printf '%s\n' 'set -x' 'make build' 'make test' |
-  .claude/skills/tmux-control/scripts/tmux_control.sh run \
-    --target project-work::run --command - --label build-test --timeout 900
-```
-
-On timeout the command keeps running in the pane; the timeout message prints
-the exact `wait-for --run-id <id>` resume command — run it verbatim. The
-`--run-id` form composes the anchored completion pattern internally, so it is
-immune to echoed text and stale scrollback, unlike a hand-written `--pattern`.
-
 ## Capture
 
 ```bash
@@ -60,19 +28,6 @@ immune to echoed text and stale scrollback, unlike a hand-written `--pattern`.
   --lines 200 \
   --join-wrapped \
   --output .tmux-control/captures/project-work.txt
-```
-
-## Wait-for
-
-Poll a pane until output matches an ERE (prints the pane tail; exits 1 on
-timeout). Prefer this over hand-rolled `for`/`sleep`/`capture` loops.
-
-```bash
-.claude/skills/tmux-control/scripts/tmux_control.sh wait-for \
-  --target project-work::run \
-  --pattern '[0-9]+ passed|[0-9]+ failed|error' \
-  --timeout 120 \
-  --lines 60
 ```
 
 ## Status
