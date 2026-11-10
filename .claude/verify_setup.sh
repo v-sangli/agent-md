@@ -294,9 +294,9 @@ else
 fi
 
 tc="$REPO_DIR/.claude/skills/tmux-control/scripts/tmux_control.sh"
-tc_env="TMUX_CONTROL_STATE_DIR=/tmp/verify_tmux_state CLAUDE_CODE_SESSION_ID=verify-$$"
+tc_env="CLAUDE_CODE_SESSION_ID=verify-$$"
 run_expect "tmux-control root request: user-owned session + sudo -i, never sudo tmux" 0 bash -lc "$tc_env '$tc' root-request --session root-verify --cwd '$REPO_DIR' --command 'true' >/tmp/verify_root_request.out && rg -q 'tmux attach -t root-verify' /tmp/verify_root_request.out && ! rg -q 'sudo tmux|paste the output|in-session ! sudo.*alternative' /tmp/verify_root_request.out && tmux has-session -t root-verify && tmux capture-pane -p -t root-verify | rg -q 'sudo -i'; rc=\$?; $tc_env '$tc' stop --session root-verify >/dev/null; exit \$rc"
-run_expect "tmux-control cleanup stops only own non-kept sessions" 0 bash -lc "$tc_env '$tc' start --session verify-own >/dev/null && $tc_env '$tc' start --session verify-kept --keep >/dev/null && TMUX_CONTROL_STATE_DIR=/tmp/verify_tmux_state CLAUDE_CODE_SESSION_ID=verify-other-$$ '$tc' start --session verify-other >/dev/null && $tc_env '$tc' cleanup >/dev/null; ! tmux has-session -t verify-own 2>/dev/null && tmux has-session -t verify-kept && tmux has-session -t verify-other; rc=\$?; for s in verify-own verify-kept verify-other; do $tc_env '$tc' stop --session \$s >/dev/null; done; exit \$rc"
+run_expect "tmux-control cleanup stops only own non-kept sessions" 0 bash -lc "$tc_env '$tc' start --session verify-own >/dev/null && $tc_env '$tc' start --session verify-kept --keep >/dev/null && CLAUDE_CODE_SESSION_ID=verify-other-$$ '$tc' start --session verify-other >/dev/null && $tc_env '$tc' cleanup >/dev/null; ! tmux has-session -t verify-own 2>/dev/null && tmux has-session -t verify-kept && tmux has-session -t verify-other; rc=\$?; for s in verify-own verify-kept verify-other; do $tc_env '$tc' stop --session \$s >/dev/null; done; exit \$rc"
 
 printf '\nSUMMARY | PASS=%d FAIL=%d\n' "$pass_count" "$fail_count"
 if [ "$fail_count" -ne 0 ]; then

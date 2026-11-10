@@ -11,6 +11,6 @@ zip -qr "$OUTPUT_PATH" \
   .claude-workflow \
   CLAUDE.md \
   HARNESS_CHECKLIST.md \
-  -x '*/__pycache__/*' '*.pyc' '.tmux-control/*'
+  -x '*/__pycache__/*' '*.pyc'
 
 printf '%s\n' "$OUTPUT_PATH"

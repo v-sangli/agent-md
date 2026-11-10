@@ -1,12 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Anchor the state dir to the workspace, not the caller's cwd: the persistent
-# shell cwd drifts between calls, so a relative default made `capture` look for
-# the alias file somewhere `start` never wrote it ("no aliases recorded").
-# pwd -P fallback so the twin spellings of a path share one state dir.
-state_dir="${TMUX_CONTROL_STATE_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd -P)}/.tmux-control}"
-case "$state_dir" in /*) ;; *) state_dir="$(pwd -P)/$state_dir" ;; esac
+# Pane roles live in tmux itself (pane option @role), not in a state dir:
+# a file-based alias map depended on the caller's cwd/workspace and left
+# directories wherever the agent happened to be.
 
 usage() {
   cat <<'EOF'
@@ -32,16 +29,6 @@ sanitize() {
   printf '%s' "$1" | tr -cs 'A-Za-z0-9._-' '_' | sed 's/^[._-]*//; s/[._-]*$//; s/^$/manual/'
 }
 
-alias_file() {
-  mkdir -p "$state_dir/sessions"
-  printf '%s/sessions/%s.aliases\n' "$state_dir" "$(sanitize "$1")"
-}
-
-save_alias() {
-  local session="$1" alias="$2" pane="$3"
-  printf '%s=%s\n' "$alias" "$pane" >>"$(alias_file "$session")"
-}
-
 resolve_target() {
   local target="$1"
   if [[ "$target" != *::* ]]; then
@@ -51,12 +38,11 @@ resolve_target() {
 
   local session="${target%%::*}"
   local alias="${target#*::}"
-  local file
-  file="$(alias_file "$session")"
-  [ -f "$file" ] || die "no aliases recorded for session '$session'"
+  tmux has-session -t "$session" 2>/dev/null || die "no tmux session '$session'"
 
   local pane
-  pane="$(awk -F= -v key="$alias" '$1 == key { print $2; found=1 } END { exit found ? 0 : 1 }' "$file")" \
+  pane="$(tmux list-panes -s -t "$session" -F '#{@role} #{pane_id}' |
+    awk -v key="$alias" '$1 == key { print $2; found=1; exit } END { exit found ? 0 : 1 }')" \
     || die "unknown alias '$alias' for session '$session'"
   printf '%s\n' "$pane"
 }
@@ -94,7 +80,6 @@ cmd_start() {
     fi
   fi
 
-  rm -f "$(alias_file "$session")"
   tmux new-session -d -s "$session" -n control -c "$root"
   # Tag the owning Claude session so `cleanup` (and the SessionEnd hook) only
   # ever kills sessions this agent created, never the user's or other agents'.
@@ -117,7 +102,7 @@ cmd_start() {
       pane="$(tmux split-window -h -d -P -F '#{pane_id}' -t "$first" -c "$root")"
     fi
     tmux select-pane -t "$pane" -T "$role"
-    save_alias "$session" "$role" "$pane"
+    tmux set-option -p -t "$pane" @role "$role"
     send_keys "$pane" "cd $(printf '%q' "$root")"
   done
 
@@ -129,7 +114,6 @@ cmd_start() {
   printf 'Started tmux session: %s\n' "$session"
   printf 'Attach: tmux attach -t %s\n' "$session"
   printf 'Aliases: %s\n' "$roles"
-  printf 'State: %s\n' "$(alias_file "$session")"
 }
 
 cmd_send() {
@@ -222,11 +206,7 @@ cmd_status() {
     esac
   done
   if [ -n "$session" ]; then
-    tmux list-panes -t "$session" -F '#{session_name} #{window_name}.#{pane_index} #{pane_id} #{pane_title} #{pane_current_command} #{pane_current_path}'
-    if [ -f "$(alias_file "$session")" ]; then
-      printf '\nAliases:\n'
-      cat "$(alias_file "$session")"
-    fi
+    tmux list-panes -s -t "$session" -F '#{session_name} #{window_name}.#{pane_index} #{pane_id} role=#{@role} #{pane_current_command} #{pane_current_path}'
   else
     tmux list-panes -a -F '#{session_name} #{window_name}.#{pane_index} #{pane_id} #{pane_title} #{pane_current_command} #{pane_current_path}'
   fi
@@ -294,7 +274,6 @@ cmd_stop() {
   done
   [ -n "$session" ] || die "stop requires --session"
   tmux kill-session -t "$session" 2>/dev/null || true
-  rm -f "$(alias_file "$session")"
   printf 'Stopped tmux session: %s\n' "$session"
 }
 

@@ -40,6 +40,6 @@ No tool call is blocked — the harness is advisory (see
   it never uses `sudo tmux` or suggests in-session `! sudo`.
 - `cleanup` stops only sessions tagged with the caller's
   `CLAUDE_CODE_SESSION_ID`, and skips `--keep` sessions.
-- The state dir is anchored to the workspace, so `start` and `capture` resolve
-  the same alias file even when the shell cwd drifts between calls.
+- Pane roles are stored as tmux pane options (`@role`); no state directory is
+  written, so `SESSION::role` targets resolve from any cwd.
 - The user can attach with `tmux attach -t <session>`.

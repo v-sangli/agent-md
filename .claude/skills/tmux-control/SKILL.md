@@ -64,7 +64,7 @@ For non-trivial tmux workflows, preserve:
 - initial failure output
 - final verification output
 
-Use `.tmux-control/captures/` for durable captures.
+For durable captures, pass `capture --output <path>` with a path the task owns (for example a log dir in the repo or the session scratchpad).
 
 ## Failure Recovery
 

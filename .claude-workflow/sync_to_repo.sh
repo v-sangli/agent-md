@@ -29,7 +29,6 @@ EXCLUDES=(
   --exclude 'settings.local.json'
   --exclude 'scheduled_tasks.lock'
   --exclude '*.tmp.*'
-  --exclude '.tmux-control/'
   --exclude '__pycache__/'
   --exclude '*.pyc'
 )

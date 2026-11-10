@@ -6,6 +6,20 @@ decision being made. Run `bash .claude/verify_setup.sh` after every harness chan
 
 ## Decisions
 
+### 2026-11-09 — tmux-control: drop the state dir, store roles in tmux
+- **Problem:** the `.tmux-control/` state dir only held role→pane alias files,
+  but its location depended on `$CLAUDE_PROJECT_DIR`/cwd, which the agent moves
+  around, so dirs appeared in odd places; the same dependency caused the
+  August `no aliases recorded` failures.
+- **Decision (owner-approved):** `start` sets pane option `@role` (tmux 3.0+);
+  `SESSION::role` resolves via `list-panes -F '#{@role} #{pane_id}'`. State
+  dir, `TMUX_CONTROL_STATE_DIR`, alias files, and the `.tmux-control/`
+  ignore/exclude entries are removed. Captures go only to an explicit
+  `--output` path.
+- **Verify:** `bash .claude/verify_setup.sh`; manual: `start` in one dir,
+  `send`/`wait`/`capture` from another with `CLAUDE_PROJECT_DIR` unset —
+  resolves, no `.tmux-control` created.
+
 ### 2026-11-09 — merge man_agent-md variant; opus subagents; tmux root flow + cleanup
 - **Problem:** `man_agent-md.zip` (2026-10-19, another machine's copy) carried
   rules the template lacked: worktrees default off, `worktree.bgIsolation:

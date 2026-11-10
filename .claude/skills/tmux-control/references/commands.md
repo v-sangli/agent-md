@@ -27,7 +27,7 @@ Run these commands from the project root.
   --target project-work::run \
   --lines 200 \
   --join-wrapped \
-  --output .tmux-control/captures/project-work.txt
+  --output logs/project-work.txt
 ```
 
 ## Status
