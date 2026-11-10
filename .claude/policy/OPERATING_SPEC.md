@@ -80,9 +80,10 @@ surface password prompts. The desired behavior is:
 1. disclose that elevated privilege appears to be the direct path;
 2. provide any cheap no-root information that is genuinely equivalent or useful;
 3. avoid building on a partial workaround;
-4. request a visible root tmux session through `tmux-control` when privilege is
-   necessary, or let the native `sudo` ask-prompt cover short commands when the
-   user is present.
+4. offer the visible root tmux session through `tmux-control` first whenever
+   privilege is necessary. The session stays user-owned and escalates in-pane
+   with `sudo -i`; a `sudo tmux` server would be root-owned and unreachable by
+   the agent.
 
 ## 5. Environment Boundary
 

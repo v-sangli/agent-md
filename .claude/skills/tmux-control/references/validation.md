@@ -24,18 +24,22 @@ tmux kill-session -t tmux-control-smoke
 Check the sudo request path:
 
 ```bash
-.claude/skills/tmux-control/scripts/tmux_control.sh root-request --session root-smoke --cwd "$PWD" --command 'sudo true'
+.claude/skills/tmux-control/scripts/tmux_control.sh root-request --session root-smoke --cwd "$PWD" --command 'true'
+tmux has-session -t root-smoke   # reachable without sudo: server is user-owned
+.claude/skills/tmux-control/scripts/tmux_control.sh stop --session root-smoke
 ```
 
-The output must ask the user to approve a visible root tmux session. It must not suggest in-session `! sudo`, ask for paste-output execution, or execute `sudo`.
+The output must give a plain `tmux attach -t root-smoke` line and the pane must show `sudo -i`. It must never contain `sudo tmux`, suggest in-session `! sudo`, or ask for paste-output execution.
 
 ## Expected Behavior
 
 No tool call is blocked — the harness is advisory (see
 `.claude/policy/OPERATING_SPEC.md`). The verifier should prove:
 
-- `root-request` offers only a visible root tmux session; it never suggests
-  in-session `! sudo` or executes `sudo` itself.
+- `root-request` opens a user-owned session and types `sudo -i` into its pane;
+  it never uses `sudo tmux` or suggests in-session `! sudo`.
+- `cleanup` stops only sessions tagged with the caller's
+  `CLAUDE_CODE_SESSION_ID`, and skips `--keep` sessions.
 - The state dir is anchored to the workspace, so `start` and `capture` resolve
   the same alias file even when the shell cwd drifts between calls.
 - The user can attach with `tmux attach -t <session>`.

@@ -6,6 +6,31 @@ decision being made. Run `bash .claude/verify_setup.sh` after every harness chan
 
 ## Decisions
 
+### 2026-11-09 — merge man_agent-md variant; opus subagents; tmux root flow + cleanup
+- **Problem:** `man_agent-md.zip` (2026-10-19, another machine's copy) carried
+  rules the template lacked: worktrees default off, `worktree.bgIsolation:
+  "none"`, no commits unless asked, no `$(...)` in shell commands. Its skills,
+  hooks, and policy were otherwise identical; its `settings.local.json` and
+  sandbox-path bullet were machine-specific. Separately: superpowers SDD tiered
+  subagent models by difficulty, and cheaper first attempts cost more debugging;
+  agents forgot the root tmux path existed; `root-request` told users to run
+  `sudo tmux new-session`, which starts a root-owned tmux server the agent
+  cannot reach; agents left sessions open, accumulating dozens over time.
+- **Decision (owner-directed):** merge the zip's generic `CLAUDE.md` sections
+  and `bgIsolation` setting (machine paths dropped). SDD Model Selection and
+  prompt templates now say `model: opus` for every role; `CLAUDE.md` restates
+  it. `root-request` now creates a user-owned session and types `sudo -i` into
+  the pane; the agent `wait`s for `^root@` before sending anything. Root tmux is
+  the first-offered option in `AGENT_RULES.md`, `CLAUDE.md`, and the
+  SessionStart reminder. `start` tags sessions with `@claude_session =
+  $CLAUDE_CODE_SESSION_ID`; new `stop` and `cleanup` (own, non-`--keep`
+  sessions only); a `SessionEnd` hook runs `cleanup --idle-only` as a safety
+  net, sparing panes running a non-shell process because `claude -p
+  --continue` ends a session every turn.
+- **Verify:** `bash .claude/verify_setup.sh`; new checks cover the root flow
+  (user-owned, `sudo -i`, no `sudo tmux`) and owner-scoped cleanup. Hook tested
+  by hand: idle own session reaped, busy own session kept.
+
 ### 2026-08-12 — formalize the template: delete retired code, enforce portability
 - **Problem:** `agent-md` had not been synced since 2026-07-18, so the template
   still shipped the blocking model the workspace abandoned on 07-26. Reviewing

@@ -42,13 +42,28 @@ Run these commands from the project root.
 .claude/skills/tmux-control/scripts/tmux_control.sh interrupt --target project-work::run
 ```
 
+## Stop And Cleanup
+
+```bash
+# one session, when its work is done
+.claude/skills/tmux-control/scripts/tmux_control.sh stop --session project-work
+# every session this Claude session started (skips `start --keep` ones)
+.claude/skills/tmux-control/scripts/tmux_control.sh cleanup
+```
+
 ## Root Request
 
 ```bash
 .claude/skills/tmux-control/scripts/tmux_control.sh root-request \
   --session root-project-install \
   --cwd "$PWD" \
-  --command 'sudo apt install python3.12-venv'
+  --command 'apt install python3.12-venv'
+# user attaches and types the password; then:
+.claude/skills/tmux-control/scripts/tmux_control.sh wait \
+  --target root-project-install::root --pattern '^root@' --timeout 600
+.claude/skills/tmux-control/scripts/tmux_control.sh send \
+  --target root-project-install::root --command 'apt install -y python3.12-venv'
+.claude/skills/tmux-control/scripts/tmux_control.sh stop --session root-project-install
 ```
 
 ## Attach

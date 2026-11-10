@@ -11,9 +11,9 @@ Use tmux whenever opaque one-shot shell execution would hide progress, prompts, 
 
 - Run benchmark, test, install, build, clone, migration, server, watcher, debugger, and nested-agent commands in tmux.
 - Keep direct shell only for quick read-only inspection such as `pwd`, `ls`, `rg`, `sed`, `cat`, `find`, `head`, `tail`, `wc`, `stat`, `file`, and `git status`.
-- For sudo/root behavior, follow `.claude/policy/AGENT_RULES.md` and [references/sudo.md](references/sudo.md).
+- For sudo/root work, the root tmux session below is always the first option. Follow `.claude/policy/AGENT_RULES.md` and [references/sudo.md](references/sudo.md).
 - Report the attach command, pane roles, and any durable capture location.
-- Leave long-running sessions alive unless the user asks for cleanup.
+- Stop every session you started once its work is done (`stop --session NAME`, or `cleanup` for all of yours). Use `start --keep` only for a service the user wants left running, and say so. Never stop sessions you did not start.
 
 ## Start Or Reuse A Session
 
@@ -23,7 +23,10 @@ Use the bundled helper:
 .claude/skills/tmux-control/scripts/tmux_control.sh start --session <name> --root "$PWD" --roles run,logs --replace
 .claude/skills/tmux-control/scripts/tmux_control.sh send --target <name>::run --command '<command>'
 .claude/skills/tmux-control/scripts/tmux_control.sh capture --target <name>::run --lines 200
+.claude/skills/tmux-control/scripts/tmux_control.sh stop --session <name>
 ```
+
+Sessions are tagged with `$CLAUDE_CODE_SESSION_ID`; `cleanup` stops only yours. A `SessionEnd` hook reaps your idle sessions as a safety net, but do not rely on it.
 
 Read [references/commands.md](references/commands.md) for command examples.
 
@@ -41,13 +44,14 @@ Use role names that make the workflow obvious:
 
 ## Sudo Policy
 
-Generate root-terminal request wording with:
+Open the root session (user-owned tmux, `sudo -i` typed into the pane):
 
 ```bash
-.claude/skills/tmux-control/scripts/tmux_control.sh root-request --session root-<task> --cwd "$PWD" --command '<sudo-command>'
+.claude/skills/tmux-control/scripts/tmux_control.sh root-request --session root-<task> --cwd "$PWD" --command '<command>'
+.claude/skills/tmux-control/scripts/tmux_control.sh wait --target root-<task>::root --pattern '^root@' --timeout 600
 ```
 
-Read [references/sudo.md](references/sudo.md) before designing a privileged workflow.
+Relay the printed attach line to the user, wait for the root prompt, then `send` commands. Never `sudo tmux`. Read [references/sudo.md](references/sudo.md) before designing a privileged workflow.
 
 ## Logging
 

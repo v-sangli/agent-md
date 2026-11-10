@@ -21,5 +21,9 @@ RULE SOURCES:
 
 POINTERS:
 - Use tmux-control when work needs visible shell execution.
+- Need sudo/root? FIRST option is always tmux-control root-request (user-owned
+  session + `sudo -i` in the pane). Never `sudo tmux`; never opaque sudo.
+- Stop every tmux session you started when its work is done:
+  tmux_control.sh stop --session NAME (or cleanup for all of yours).
 - Use bash .claude/verify_setup.sh after harness changes.
 EOF

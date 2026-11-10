@@ -19,17 +19,25 @@ them unless there is a concrete reason not to. Design rationale lives in
 - Prefer `tmux-control` for tests, installs, builds, benchmarks, nested agents,
   and long-running work: the user gets a visible, attachable session and a
   durable log. This is encouragement, not a gate.
+- Clean up your own tmux sessions: `tmux_control.sh stop --session NAME` when
+  a session's work is done, or `tmux_control.sh cleanup` to stop every session
+  this Claude session started. Pass `start --keep` only for a service the user
+  wants left running, and report it. Never stop sessions you did not start.
 - Invoke helper scripts with absolute paths, or `cd` to the workspace root
   first — the persistent shell cwd drifts between Bash calls.
 - Do not poll with a foreground `sleep`; the harness blocks it. Wait on a
   condition with `tmux_control.sh wait` or the `Monitor` tool.
 
 3. Privilege.
-- Prefer the `tmux-control` root-request flow for sudo work: Claude Code's
-  opaque shell cannot surface password prompts; a visible root tmux session
-  can.
-- Plain `sudo` prompts through permissions; acceptable when the user is
-  present and the command is short.
+- When work needs sudo/root, the root tmux session is the first option you
+  offer, before any alternative: `tmux_control.sh root-request`. Claude Code's
+  opaque shell cannot surface password prompts; a visible tmux pane can.
+- The root session is a user-owned tmux session escalated inside the pane with
+  `sudo -i`. Never `sudo tmux ...`: that starts a root-owned tmux server the
+  agent cannot reach, and it hides the user's own sessions.
+- Send nothing to the pane until the root prompt appears (`wait --pattern
+  '^root@'`); earlier keystrokes land in the password prompt.
+- `stop` the root session as soon as the scoped work is done.
 
 4. Environment.
 - Read `.claude/ENV.md` before Python, pytest, uv, dependency, install, or build work.

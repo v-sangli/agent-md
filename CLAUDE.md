@@ -14,6 +14,40 @@ Rule sources:
 - Use `.claude/ENV.md` before Python, pytest, uv, dependency, install, or build work.
 - Use `.claude/skills/tmux-control/` for visible shell workflows when routed there by the rules.
 - Run `bash .claude/verify_setup.sh` after harness changes.
+- Sudo/root work: offer the `tmux-control` root session first (`tmux_control.sh root-request`). It is a user-owned tmux session escalated in-pane with `sudo -i`; never `sudo tmux`.
+- Stop every tmux session you started when its work is done (`tmux_control.sh stop` / `cleanup`). Never stop sessions you did not start.
+
+## Subagent models
+
+Use `model: opus` for every subagent dispatched by superpowers skills (implementers, reviewers, final review). Do not tier models by task difficulty: better first implementations mean less debugging.
+
+## Worktrees and commits
+
+These override any skill, tool description, or background-session guidance that says otherwise.
+
+**Worktrees are a judgement call, default off.**
+
+- Work directly in this workspace. Do not create or enter a worktree on your own initiative.
+- Only when the work is a major undertaking — broad cross-repo refactor, risky long-running migration, or parallel jobs that would collide on the same files — stop and ask whether a worktree is wanted. Do not enter one without agreement.
+- `worktree.bgIsolation: "none"` is set so background jobs write to real checkouts directly. That is deliberate. The guard is per-git-repo: when the workspace root is not itself a repo and holds several sub-repos, also set it in user-scope `~/.claude/settings.json`, because the agent cannot write a sub-repo's `.claude/settings.json` once the guard is active.
+
+**Do not commit unless asked.**
+
+- No `git commit`, `git commit --amend`, or `git push` unless I request it in that message.
+- This applies to plan checkpoints and end-of-task wrap-up too. Leave the work in the working tree and report what changed and where.
+
+## Shell command shape
+
+Applies to subagents and Monitor/watcher commands too.
+
+- Never use `$(...)` or backticks. Command substitution cannot be checked statically, so
+  it always raises an approval prompt that no allowlist can suppress — that prompt has no
+  "don't ask again" option. Rewrite without it.
+- To wait on a process: `while pgrep -f "[p]attern" >/dev/null; do sleep 5; done`. Test the
+  exit status directly; no `$(pgrep ...)` + `kill -0` needed. The bracket around the first
+  character keeps `pgrep -f` from matching the waiting loop's own command line — without it
+  the loop matches itself and never exits.
+- Keep paths inside the workspace or the session scratchpad. Anything else leaves the sandbox and prompts.
 
 ## Karpathy guidelines
 

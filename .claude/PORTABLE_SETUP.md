@@ -70,10 +70,11 @@ This checks:
 - `tmux-control` is installed in `.claude/skills/tmux-control/`
 - Claude Code Tips is installed as `.claude/skills/dx/`, preserving its plugin namespace and repo glue files.
 - Superpowers is installed as `.claude/skills/superpowers/`, preserving its plugin namespace and repo glue files.
-- settings.json is advisory: `SessionStart` only, no blocking hooks, no machine-specific absolute paths
+- settings.json is advisory: `SessionStart`/`SessionEnd` only, no blocking hooks, no machine-specific absolute paths
 - session bootstrap works
 - the retired blocking guards and harness runner are absent
-- `root-request` offers only a visible root tmux session and never runs `sudo` itself
+- `root-request` opens a user-owned tmux session with `sudo -i` waiting for the password, never `sudo tmux`
+- `cleanup` stops only the calling Claude session's tmux sessions
 
 ## 5) Verify live Claude integration
 

@@ -102,6 +102,7 @@ need_file ".claude/policy/AGENT_RULES.md"
 need_file ".claude/policy/OPERATING_SPEC.md"
 need_file ".claude/settings.json"
 need_file ".claude/hooks/session_start.sh"
+need_file ".claude/hooks/session_end.sh"
 need_file ".claude/skills/tmux-control/SKILL.md"
 need_file ".claude/skills/tmux-control/references/commands.md"
 need_file ".claude/skills/tmux-control/references/sudo.md"
@@ -140,6 +141,7 @@ need_absent ".claude/hooks/pre_tool_use_bash_guard.sh"
 need_absent ".claude/hooks/post_tool_use_privilege_guard.sh"
 
 need_exec ".claude/hooks/session_start.sh"
+need_exec ".claude/hooks/session_end.sh"
 need_exec ".claude/skills/tmux-control/scripts/tmux_control.sh"
 
 # Portability: this harness is a general template. Only .claude/ENV.md may name
@@ -165,9 +167,9 @@ if jq -e '
   ((.permissions.ask // []) | index("Bash(sudo:*)") != null) and
   ([.. | strings | select(test("^/home/|^/Users/"))] | length == 0)
 ' "$REPO_DIR/.claude/settings.json" >/dev/null; then
-  pass "settings.json is advisory: SessionStart only, broad allow, no absolute paths"
+  pass "settings.json is advisory: SessionStart/SessionEnd only, broad allow, no absolute paths"
 else
-  fail "settings.json is advisory: SessionStart only, broad allow, no absolute paths"
+  fail "settings.json is advisory: SessionStart/SessionEnd only, broad allow, no absolute paths"
 fi
 
 standalone_names=""
@@ -291,7 +293,10 @@ else
   pass "session_start output avoids removed scaffolding"
 fi
 
-run_expect "tmux-control root request only offers root tmux" 0 bash -lc "cd '$REPO_DIR' && .claude/skills/tmux-control/scripts/tmux_control.sh root-request --session root-verify --cwd '$REPO_DIR' --command 'sudo true' >/tmp/verify_root_request.out && rg -q 'approve a visible root tmux session' /tmp/verify_root_request.out && rg -q 'real terminal' /tmp/verify_root_request.out && ! rg -q 'Option 1|paste the output|in-session ! sudo.*alternative' /tmp/verify_root_request.out"
+tc="$REPO_DIR/.claude/skills/tmux-control/scripts/tmux_control.sh"
+tc_env="TMUX_CONTROL_STATE_DIR=/tmp/verify_tmux_state CLAUDE_CODE_SESSION_ID=verify-$$"
+run_expect "tmux-control root request: user-owned session + sudo -i, never sudo tmux" 0 bash -lc "$tc_env '$tc' root-request --session root-verify --cwd '$REPO_DIR' --command 'true' >/tmp/verify_root_request.out && rg -q 'tmux attach -t root-verify' /tmp/verify_root_request.out && ! rg -q 'sudo tmux|paste the output|in-session ! sudo.*alternative' /tmp/verify_root_request.out && tmux has-session -t root-verify && tmux capture-pane -p -t root-verify | rg -q 'sudo -i'; rc=\$?; $tc_env '$tc' stop --session root-verify >/dev/null; exit \$rc"
+run_expect "tmux-control cleanup stops only own non-kept sessions" 0 bash -lc "$tc_env '$tc' start --session verify-own >/dev/null && $tc_env '$tc' start --session verify-kept --keep >/dev/null && TMUX_CONTROL_STATE_DIR=/tmp/verify_tmux_state CLAUDE_CODE_SESSION_ID=verify-other-$$ '$tc' start --session verify-other >/dev/null && $tc_env '$tc' cleanup >/dev/null; ! tmux has-session -t verify-own 2>/dev/null && tmux has-session -t verify-kept && tmux has-session -t verify-other; rc=\$?; for s in verify-own verify-kept verify-other; do $tc_env '$tc' stop --session \$s >/dev/null; done; exit \$rc"
 
 printf '\nSUMMARY | PASS=%d FAIL=%d\n' "$pass_count" "$fail_count"
 if [ "$fail_count" -ne 0 ]; then

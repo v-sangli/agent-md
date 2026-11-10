@@ -11,13 +11,15 @@ case "$state_dir" in /*) ;; *) state_dir="$(pwd -P)/$state_dir" ;; esac
 usage() {
   cat <<'EOF'
 Usage:
-  tmux_control.sh start --session NAME [--root DIR] [--roles a,b,c] [--replace]
+  tmux_control.sh start --session NAME [--root DIR] [--roles a,b,c] [--replace] [--keep]
   tmux_control.sh send --target SESSION::ALIAS --command COMMAND [--no-enter]
   tmux_control.sh capture --target SESSION::ALIAS [--lines N] [--join-wrapped] [--output FILE]
   tmux_control.sh status [--session NAME]
   tmux_control.sh wait (--target SESSION::ALIAS | --log FILE) --pattern REGEX [--timeout SECS] [--interval SECS]
   tmux_control.sh interrupt --target SESSION::ALIAS
   tmux_control.sh root-request --session NAME [--cwd DIR] --command COMMAND
+  tmux_control.sh stop --session NAME
+  tmux_control.sh cleanup [--owner ID] [--idle-only]
 EOF
 }
 
@@ -70,13 +72,14 @@ send_keys() {
 }
 
 cmd_start() {
-  local session="" root="." roles="run,logs" replace=0
+  local session="" root="." roles="run,logs" replace=0 keep=0
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --session) session="${2:-}"; shift 2 ;;
       --root) root="${2:-.}"; shift 2 ;;
       --roles) roles="${2:-run,logs}"; shift 2 ;;
       --replace) replace=1; shift ;;
+      --keep) keep=1; shift ;;
       *) die "unknown start option: $1" ;;
     esac
   done
@@ -93,6 +96,12 @@ cmd_start() {
 
   rm -f "$(alias_file "$session")"
   tmux new-session -d -s "$session" -n control -c "$root"
+  # Tag the owning Claude session so `cleanup` (and the SessionEnd hook) only
+  # ever kills sessions this agent created, never the user's or other agents'.
+  tmux set-option -t "$session" @claude_session "${CLAUDE_CODE_SESSION_ID:-manual}"
+  if [ "$keep" = "1" ]; then
+    tmux set-option -t "$session" @claude_keep 1
+  fi
   local first pane role
   first="$(tmux display-message -p -t "$session:control.0" '#{pane_id}')"
 
@@ -251,21 +260,69 @@ cmd_root_request() {
   cwd="$(cd "$cwd" && pwd)"
   session="$(sanitize "$session")"
 
+  # Keep the tmux server user-owned: `sudo tmux` starts a root-owned server
+  # whose socket the agent and the user's other sessions cannot reach.
+  # Escalate inside the pane instead; the password prompt stays visible to
+  # the user, and typing it is the approval.
+  cmd_start --session "$session" --root "$cwd" --roles root --replace >/dev/null
+  send_keys "$session::root" "sudo -i"
+
   cat <<EOF
-This command needs elevated privileges and may prompt for your password.
-I should not run sudo in Claude's opaque shell or suggest in-session ! sudo.
+This needs elevated privileges. I opened a visible tmux session '$session'
+and started \`sudo -i\` in it; it is waiting for your password.
 
-Please approve a visible root tmux session named '$session' for this scoped task.
-The command to run inside that root tmux session is:
+Command to run as root: $command
 
-$command
+Attach and enter your password: tmux attach -t $(printf '%q' "$session")
 
-If approved, start the root tmux session from a real terminal with:
-
-sudo tmux new-session -As $(printf '%q' "$session") -c $(printf '%q' "$cwd")
-
-Attach command after approval: sudo tmux attach -t $(printf '%q' "$session")
+Agent next steps (send nothing before the root prompt appears, or it will be
+typed into the password prompt):
+  tmux_control.sh wait --target $session::root --pattern '^root@' --timeout 600
+  tmux_control.sh send --target $session::root --command 'cd $(printf '%q' "$cwd")'
+  tmux_control.sh send --target $session::root --command '<command>'
+  tmux_control.sh stop --session $session    # when the scoped work is done
 EOF
+}
+
+cmd_stop() {
+  local session=""
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --session) session="${2:-}"; shift 2 ;;
+      *) die "unknown stop option: $1" ;;
+    esac
+  done
+  [ -n "$session" ] || die "stop requires --session"
+  tmux kill-session -t "$session" 2>/dev/null || true
+  rm -f "$(alias_file "$session")"
+  printf 'Stopped tmux session: %s\n' "$session"
+}
+
+# Stop every session tagged with this Claude session's id, except --keep ones.
+# --idle-only (SessionEnd hook) also spares sessions with any pane running a
+# non-shell process: `claude -p --continue` ends a session every turn, so a
+# job or a pending `sudo -i` prompt must outlive it.
+cmd_cleanup() {
+  local owner="${CLAUDE_CODE_SESSION_ID:-}" idle_only=0
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --owner) owner="${2:-}"; shift 2 ;;
+      --idle-only) idle_only=1; shift ;;
+      *) die "unknown cleanup option: $1" ;;
+    esac
+  done
+  [ -n "$owner" ] || die "cleanup requires --owner or CLAUDE_CODE_SESSION_ID"
+  local name tag keep
+  tmux list-sessions -F '#{session_name}' 2>/dev/null | while read -r name; do
+    tag="$(tmux show-options -qv -t "$name" @claude_session 2>/dev/null || true)"
+    keep="$(tmux show-options -qv -t "$name" @claude_keep 2>/dev/null || true)"
+    [ "$tag" = "$owner" ] && [ "$keep" != "1" ] || continue
+    if [ "$idle_only" = "1" ] &&
+      tmux list-panes -s -t "$name" -F '#{pane_current_command}' | grep -qvxE 'bash|zsh|sh|dash|fish'; then
+      continue
+    fi
+    cmd_stop --session "$name"
+  done
 }
 
 cmd="${1:-}"
@@ -283,6 +340,8 @@ case "$cmd" in
   wait) cmd_wait "$@" ;;
   interrupt) cmd_interrupt "$@" ;;
   root-request) cmd_root_request "$@" ;;
+  stop) cmd_stop "$@" ;;
+  cleanup) cmd_cleanup "$@" ;;
   -h|--help|help) usage ;;
   *) usage >&2; die "unknown command: $cmd" ;;
 esac
