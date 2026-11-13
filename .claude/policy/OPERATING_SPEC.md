@@ -3,7 +3,7 @@
 Version: 3.0
 Scope: Current advisory Claude Code workspace/harness in this repository.
 
-`AGENT_RULES.md` is the canonical rule source. This file explains how the
+`CLAUDE.md` is the canonical rule source. This file explains how the
 workspace is structured, why the rules exist, and how to verify the setup. If a
 short rule and this document drift, update both deliberately instead of treating
 this file as an additional rule layer.
@@ -24,7 +24,7 @@ hooks (`access_guard.sh`, `pre_tool_use_bash_guard.sh`,
 - The prompt/block friction outweighed the protection: the model's actual
   failure modes were path/cwd bugs, not destructive intent.
 
-The replacement model is advisory: `AGENT_RULES.md` states conventions, the
+The replacement model is advisory: `CLAUDE.md` states conventions, the
 `tmux-control` skill remains the encouraged route for visible/long-running
 work, and Claude Code's native permission `ask` list covers the few genuinely
 dangerous operations (git push, hard reset, sudo). No tool calls are blocked.
@@ -32,8 +32,7 @@ dangerous operations (git push, hard reset, sudo). No tool calls are blocked.
 ## 1. File Roles
 
 ```text
-CLAUDE.md                         always-loaded orientation and style
-.claude/policy/AGENT_RULES.md     concise canonical runtime contract (advisory)
+CLAUDE.md                         always-loaded rule source: conventions (advisory) and style
 .claude/policy/OPERATING_SPEC.md  rationale, design notes, acceptance criteria
 .claude/ENV.md                    environment identity and activation commands
 .claude/settings.json             SessionStart hook + broad permission grants
@@ -48,6 +47,14 @@ Deleted on 2026-08-12: `.claude/hooks/access_guard.sh`,
 `.claude/hooks/post_tool_use_privilege_guard.sh`, `.claude/harness/run.sh`,
 `.claude/access.conf`. They had been unregistered since the rollback; the
 rationale above is the record, and `verify_setup.sh` asserts their absence.
+
+Folded on 2026-11-13: `.claude/policy/AGENT_RULES.md` into `CLAUDE.md`
+(Conventions), wording kept. It was not auto-loaded: only a pointer led to it,
+so its rules held only when the agent went and read it. `CLAUDE.md` is always
+in context, for subagents too. One line was not carried over, "one minimal
+patch before investigation": the vendored `systematic-debugging` skill says the
+opposite (no fix before root-cause investigation) and prevails.
+`verify_setup.sh` asserts the file's absence.
 
 ## 2. Access Model
 
@@ -89,7 +96,7 @@ surface password prompts. The desired behavior is:
 
 `.claude/ENV.md` identifies the default conda environment and validation
 commands. Behavioral constraints such as avoiding durable `PYTHONPATH=.`
-workarounds live in `AGENT_RULES.md` so environment details do not become a
+workarounds live in `CLAUDE.md` so environment details do not become a
 second policy file.
 
 Conda activation is shell state, so it is not encoded in `.claude/settings.json`
@@ -99,7 +106,6 @@ Conda activation is shell state, so it is not encoded in `.claude/settings.json`
 
 The harness keeps the useful parts of the original operating spec:
 
-- one minimal patch before investigation mode;
 - no unapproved external monkey patches;
 - prefer existing modules/helpers over parallel systems;
 - propose subsystem refactors first;
@@ -127,9 +133,9 @@ bundle unless explicitly requested.
 Setup is considered correct when all are true:
 
 1. `bash .claude/verify_setup.sh` passes.
-2. `CLAUDE.md` points to the policy and environment sources instead of
-   restating every hard rule.
-3. `AGENT_RULES.md` is the only concise canonical runtime contract, and it is
+2. `CLAUDE.md` states the runtime conventions itself and points to the
+   rationale and environment sources.
+3. `CLAUDE.md` is the only rule source, and its conventions are
    advisory — no blocking hooks are registered.
 4. `OPERATING_SPEC.md` explains design/rationale without becoming a second
    stronger rule layer.

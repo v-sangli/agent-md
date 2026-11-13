@@ -15,7 +15,7 @@ STATE REINJECTION
 SESSION_ID: $session_id
 
 RULE SOURCES:
-- .claude/policy/AGENT_RULES.md is the canonical short runtime contract.
+- CLAUDE.md (Conventions) is the canonical short runtime contract.
 - .claude/policy/OPERATING_SPEC.md explains design rationale and acceptance criteria.
 - .claude/ENV.md identifies the default Python environment.
 

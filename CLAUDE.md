@@ -2,24 +2,60 @@
 
 This repository is a Claude Code workspace/harness under active design. Before changing structure, check `HARNESS_CHECKLIST.md` and update it with the decision being made.
 
-Rule sources:
-- `.claude/policy/AGENT_RULES.md`: concise runtime contract.
-- `.claude/policy/OPERATING_SPEC.md`: design rationale and acceptance criteria.
+Sources:
+- `.claude/policy/OPERATING_SPEC.md`: design rationale and acceptance criteria. Read it before changing the harness shape.
 - `.claude/ENV.md`: environment contract.
 
-## Workspace orientation
+## Conventions
 
-- Use `AGENT_RULES.md` as the canonical source for access, sudo, shell routing, environment, and validation rules.
-- Use `OPERATING_SPEC.md` for rationale before changing the harness shape.
-- Use `.claude/ENV.md` before Python, pytest, uv, dependency, install, or build work.
-- Use `.claude/skills/tmux-control/` for visible shell workflows when routed there by the rules.
-- Run `bash .claude/verify_setup.sh` after harness changes.
-- Sudo/root work: offer the `tmux-control` root session first (`tmux_control.sh root-request`). It is a user-owned tmux session escalated in-pane with `sudo -i`; never `sudo tmux`.
-- Stop every tmux session you started when its work is done (`tmux_control.sh stop` / `cleanup`). Never stop sessions you did not start.
+As of 2026-07-26 the blocking hook enforcement is rolled back (see
+`HARNESS_CHECKLIST.md`): these are conventions and defaults, not gates. Follow
+them unless there is a concrete reason not to.
 
-## Subagent models
+1. Workspace boundary.
+- Write/delete work stays inside the repo unless the user grants external scope.
+- Treat `.claude/**` as setup configuration: edit it for harness maintenance,
+  not as part of ordinary task work.
 
-Use `model: opus` for every subagent dispatched by superpowers skills (implementers, reviewers, final review). Do not tier models by task difficulty: better first implementations mean less debugging.
+2. Shell execution.
+- Direct Bash is fine for any command, including writes, deletes, and `rm -rf`
+  inside the workspace.
+- Prefer `tmux-control` for tests, installs, builds, benchmarks, nested agents,
+  and long-running work: the user gets a visible, attachable session and a
+  durable log. This is encouragement, not a gate.
+- Invoke helper scripts with absolute paths, or `cd` to the workspace root
+  first — the persistent shell cwd drifts between Bash calls.
+- Do not poll with a foreground `sleep`; the harness blocks it. Wait on a
+  condition with `tmux_control.sh wait` or the `Monitor` tool.
+
+3. Privilege.
+- Prefer the `tmux-control` root-request flow for sudo work: Claude Code's
+  opaque shell cannot surface password prompts. Default to a shared root tmux
+  session: the user opens it with sudo on its own socket and grants this user
+  access (`server-access -a`), the agent drives it via `TMUX_CONTROL_SOCKET`
+  while the user watches, and closes it when the scoped task is done.
+- Plain `sudo` prompts through permissions; acceptable when the user is
+  present and the command is short.
+
+4. Environment.
+- Read `.claude/ENV.md` before Python, pytest, uv, dependency, install, or build work.
+- Use the default environment named in `.claude/ENV.md` unless the user overrides it.
+- Do not use `PYTHONPATH=.` as a durable fix.
+
+5. External monkey patches.
+- Do not patch `site-packages`, system paths, external dependency checkouts, or other outside-repo code without explicit approval.
+- Prefer in-repo fixes, dependency pins/upgrades, wrappers, or vendored patches.
+
+6. Change discipline.
+- Extend existing modules/helpers before adding parallel systems.
+- Propose subsystem-level refactors first; use a worktree for non-trivial refactors when practical.
+- `Read` a file before `Write`/`Edit`. The tools reject an unread target, so
+  guessing at contents costs a round-trip and buys nothing.
+
+7. Verification.
+- Define success criteria before substantial edits.
+- Run the smallest meaningful validation after edits.
+- For harness changes, `bash .claude/verify_setup.sh` is the baseline verifier.
 
 ## Worktrees and commits
 

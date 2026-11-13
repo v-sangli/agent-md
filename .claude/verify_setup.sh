@@ -98,7 +98,6 @@ need_command rg
 need_command realpath
 
 need_file ".claude/ENV.md"
-need_file ".claude/policy/AGENT_RULES.md"
 need_file ".claude/policy/OPERATING_SPEC.md"
 need_file ".claude/settings.json"
 need_file ".claude/hooks/session_start.sh"
@@ -139,6 +138,11 @@ need_absent ".claude/hooks/access_guard.sh"
 need_absent ".claude/hooks/pre_tool_use_guard.sh"
 need_absent ".claude/hooks/pre_tool_use_bash_guard.sh"
 need_absent ".claude/hooks/post_tool_use_privilege_guard.sh"
+
+# Folded into CLAUDE.md (Conventions) on 2026-11-13. It was never auto-loaded,
+# so its rules held only when the agent went and read it. Absence is asserted
+# so a second rule source cannot creep back in.
+need_absent ".claude/policy/AGENT_RULES.md"
 
 need_exec ".claude/hooks/session_start.sh"
 need_exec ".claude/hooks/session_end.sh"
@@ -236,11 +240,10 @@ for required in \
   "bin/activate" \
   "python -V" \
   "which python" \
-  ".claude/policy/AGENT_RULES.md"; do
+  "CLAUDE.md"; do
   rg -Fq "$required" "$REPO_DIR/.claude/ENV.md" || env_ok=0
 done
 for required in \
-  "AGENT_RULES.md" \
   "OPERATING_SPEC.md" \
   ".claude/ENV.md"; do
   rg -Fq "$required" "$REPO_DIR/CLAUDE.md" || env_ok=0
@@ -258,7 +261,7 @@ for required in \
   "tmux-control" \
   ".claude/ENV.md" \
   "PYTHONPATH=."; do
-  rg -Fq "$required" "$REPO_DIR/.claude/policy/AGENT_RULES.md" || policy_ok=0
+  rg -Fq "$required" "$REPO_DIR/CLAUDE.md" || policy_ok=0
 done
 for required in \
   "Version: 3.0" \
@@ -268,9 +271,9 @@ for required in \
   ".claude/ENV.md"; do
   rg -Fq "$required" "$REPO_DIR/.claude/policy/OPERATING_SPEC.md" || policy_ok=0
 done
-if rg -Fq ".claude-log" "$REPO_DIR/.claude/policy/AGENT_RULES.md" "$REPO_DIR/.claude/policy/OPERATING_SPEC.md" ||
-  rg -Fq ".claude-tools" "$REPO_DIR/.claude/policy/AGENT_RULES.md" "$REPO_DIR/.claude/policy/OPERATING_SPEC.md" ||
-  rg -Fq "spec_hashes.json" "$REPO_DIR/.claude/policy/AGENT_RULES.md" "$REPO_DIR/.claude/policy/OPERATING_SPEC.md"; then
+if rg -Fq ".claude-log" "$REPO_DIR/CLAUDE.md" "$REPO_DIR/.claude/policy/OPERATING_SPEC.md" ||
+  rg -Fq ".claude-tools" "$REPO_DIR/CLAUDE.md" "$REPO_DIR/.claude/policy/OPERATING_SPEC.md" ||
+  rg -Fq "spec_hashes.json" "$REPO_DIR/CLAUDE.md" "$REPO_DIR/.claude/policy/OPERATING_SPEC.md"; then
   policy_ok=0
 fi
 if [ "$policy_ok" -eq 1 ]; then
