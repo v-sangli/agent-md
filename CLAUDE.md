@@ -127,6 +127,9 @@ These need the user's word. The agent proposes, the user confirms.
 - **An `exp/` branch**, the default home for experiment work. It must be explicitly
   allowed by the user.
 
+Any code change in a repo goes through the `dev-flow` skill: it holds the order of work
+from request to merge.
+
 ## Conventions
 
 As of 2026-07-26 the blocking hook enforcement is rolled back (see

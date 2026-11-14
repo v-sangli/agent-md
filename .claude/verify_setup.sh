@@ -101,7 +101,7 @@ need_file ".claude/ENV.md"
 need_file ".claude/policy/OPERATING_SPEC.md"
 need_file ".claude/settings.json"
 need_file ".claude/hooks/session_start.sh"
-need_file ".claude/hooks/session_end.sh"
+need_file ".claude/skills/dev-flow/SKILL.md"
 need_file ".claude/skills/tmux-control/SKILL.md"
 need_file ".claude/skills/tmux-control/references/commands.md"
 need_file ".claude/skills/tmux-control/references/sudo.md"
@@ -211,7 +211,8 @@ done
 shopt -u nullglob
 
 if printf '%s' "$standalone_names" | rg -qx 'tmux-control' &&
-  [ "$plugin_skill_count" -ge 22 ] &&
+  printf '%s' "$standalone_names" | rg -qx 'dev-flow' &&
+  [ "$plugin_skill_count" -ge 21 ] &&
   printf '%s' "$plugin_skill_names" | rg -qx 'superpowers:using-superpowers' &&
   printf '%s' "$plugin_skill_names" | rg -qx 'dx:handoff' &&
   [ "$skill_bad" -eq 0 ]; then
