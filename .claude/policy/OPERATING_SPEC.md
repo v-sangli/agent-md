@@ -170,9 +170,11 @@ repos unless the loss of their root metadata is intentional and documented.
   starting work on `main`.
 
 The record of these changes is this repository's git history. An upstream
-update means re-applying them. Upstream's docs, tests, release notes and Codex
-reference inside the plugin are left as shipped, including their mentions of
-the deleted skill. The plugin's SessionStart injection is unchanged; it does
+update means re-applying them. The plugin's README, its Codex reference and one
+regression test (`tests/claude-code/test-worktree-path-policy.sh`) no longer
+refer to the deleted skill. Upstream's release notes and dated design docs
+still name it; they are history and are left as shipped. The plugin's
+SessionStart injection is unchanged; it does
 not reach subagents, which is one reason rules live in `CLAUDE.md`.
 
 ## 8. Portability
@@ -205,7 +207,7 @@ Setup is considered correct when all are true:
 
 When updating this harness intentionally:
 
-1. Update `HARNESS_CHECKLIST.md` with the decision being made.
+1. Record the decision being made in this file.
 2. Keep active scripts Bash-only.
 3. Prefer editing the canonical source over repeating a rule in more files.
 4. Run `bash .claude/verify_setup.sh`.

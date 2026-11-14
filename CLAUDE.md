@@ -1,9 +1,9 @@
 # Claude Project Context
 
-This repository is a Claude Code workspace/harness under active design. Before changing structure, check `HARNESS_CHECKLIST.md` and update it with the decision being made.
+This repository is a Claude Code workspace/harness under active design. Before changing structure, read `.claude/policy/OPERATING_SPEC.md` and record the decision being made there.
 
 Sources:
-- `.claude/policy/OPERATING_SPEC.md`: design rationale and acceptance criteria. Read it before changing the harness shape.
+- `.claude/policy/OPERATING_SPEC.md`: design rationale, decisions and acceptance criteria.
 - `.claude/ENV.md`: environment contract.
 
 ## Code stance
@@ -133,7 +133,7 @@ from request to merge.
 ## Conventions
 
 As of 2026-07-26 the blocking hook enforcement is rolled back (see
-`HARNESS_CHECKLIST.md`): these are conventions and defaults, not gates. Follow
+`.claude/policy/OPERATING_SPEC.md`): these are conventions and defaults, not gates. Follow
 them unless there is a concrete reason not to.
 
 1. Workspace boundary.
