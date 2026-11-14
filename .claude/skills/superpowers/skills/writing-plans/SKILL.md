@@ -13,7 +13,7 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 **Announce at start:** "I'm using the writing-plans skill to create the implementation plan."
 
-**Context:** If working in an isolated worktree, it should have been created via the `superpowers:using-git-worktrees` skill at execution time.
+**Context:** The feature branch and its worktree already exist before the plan is written (dev-flow step 2, via the `superpowers:using-git-worktrees` skill).
 
 **Save plans to:** `docs/superpowers/plans/YYYY-MM-DD-<feature-name>.md`
 - (User preferences for plan location override this default)
@@ -58,7 +58,7 @@ independently testable deliverable.
 ```markdown
 # [Feature Name] Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** [One sentence describing what this builds]
 
@@ -73,7 +73,28 @@ naming and copy rules, platform requirements — one line each, with exact
 values copied verbatim from the spec. Every task's requirements implicitly
 include this section.]
 
+## Contract
+
+[What was agreed at the interface checkpoint, copied unchanged.
+- Verdict: the decision this plan carries out, in a sentence or two.
+- Signatures: the agreed signatures and frozen dataclasses, no bodies.
+- Variation axes: which of the repo's axes the change is generic over, and
+  which it deliberately fixes.
+Tasks implement this contract and add nothing to it.]
+
 ---
+```
+
+A plan for a `refactor/` branch also carries a migration table, between the
+contract and the tasks. One row per thing that moves, is renamed or is deleted.
+The Verify column is required.
+
+```markdown
+## Migration Table
+
+| From | To | Verify |
+|---|---|---|
+| `old/path.py::OldName` | `new/path.py::NewName` | [exact command or test showing behavior is unchanged] |
 ```
 
 ## Task Structure
@@ -92,7 +113,7 @@ include this section.]
   and return types. A task's implementer sees only their own task; this
   block is how they learn the names and types neighboring tasks use.]
 
-- [ ] **Step 1: Write the failing test**
+**Step 1: Write the failing test**
 
 ```python
 def test_specific_behavior():
@@ -100,24 +121,24 @@ def test_specific_behavior():
     assert result == expected
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+**Step 2: Run test to verify it fails**
 
 Run: `pytest tests/path/test.py::test_name -v`
 Expected: FAIL with "function not defined"
 
-- [ ] **Step 3: Write the implementation the contract calls for**
+**Step 3: Write the implementation the contract calls for**
 
 ```python
 def function(input):
     return expected
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+**Step 4: Run test to verify it passes**
 
 Run: `pytest tests/path/test.py::test_name -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+**Step 5: Commit**
 
 ```bash
 git add tests/path/test.py src/path/file.py
