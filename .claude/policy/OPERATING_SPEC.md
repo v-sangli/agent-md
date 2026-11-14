@@ -1,6 +1,6 @@
 # Claude Operating Specification
 
-Version: 3.0
+Version: 3.1
 Scope: Current advisory Claude Code workspace/harness in this repository.
 
 `CLAUDE.md` is the canonical rule source. This file explains how the
@@ -29,17 +29,46 @@ The replacement model is advisory: `CLAUDE.md` states conventions, the
 work, and Claude Code's native permission `ask` list covers the few genuinely
 dangerous operations (git push, hard reset, sudo). No tool calls are blocked.
 
+## 0.1 The 3.1 Restructure
+
+On 2026-11-13 the harness was reshaped around an agreed design methodology. The
+enforcement model is unchanged: advisory text and the user's gates on the agent
+side; mechanical checks belong to each repo's CI and branch protection, not to
+hooks here. What changed is where things live. Three homes, split by the kind of
+statement:
+
+- `CLAUDE.md` holds what is true whatever the task: the code stance, the
+  isolation rules and gates, the runtime conventions. It is always in context,
+  for subagents too, so it is the only home for a rule that constrains code.
+- `.claude/skills/dev-flow/` holds the order of work for a code change, from
+  request to merge, and the points where the user confirms. It states no rule
+  of its own.
+- The vendored `superpowers` skills hold the technique for one step. Each skill
+  used to require the next; those hand-offs now return to `dev-flow`.
+
+How the text is edited:
+
+- A rule is written once, in its home.
+- A line that says the opposite is edited or deleted in the same commit.
+  Nothing is overridden from elsewhere. The former `CLAUDE.md` block that
+  declared itself an override of any skill is gone, together with the "default
+  off" worktree rule and the "do not commit unless asked" rule it carried.
+- A skill may name a rule at the moment it applies, in one line. It does not
+  restate it.
+
 ## 1. File Roles
 
 ```text
-CLAUDE.md                         always-loaded rule source: conventions (advisory) and style
+CLAUDE.md                         always-loaded rule source: code stance, isolation and gates,
+                                  conventions (advisory), style
 .claude/policy/OPERATING_SPEC.md  rationale, design notes, acceptance criteria
+.claude/skills/dev-flow/          order of work for a code change, request to merge
 .claude/ENV.md                    environment identity and activation commands
 .claude/settings.json             SessionStart hook + broad permission grants
 .claude/hooks/session_start.sh    state reinjection at session start
 .claude/skills/tmux-control/      visible shell/root workflow helper
 .claude/skills/dx/                vendored Claude Code Tips plugin
-.claude/skills/superpowers/       vendored Superpowers plugin
+.claude/skills/superpowers/       vendored Superpowers plugin, locally amended (section 7)
 ```
 
 Deleted on 2026-08-12: `.claude/hooks/access_guard.sh`,
@@ -104,22 +133,47 @@ Conda activation is shell state, so it is not encoded in `.claude/settings.json`
 
 ## 6. Change Discipline
 
-The harness keeps the useful parts of the original operating spec:
+The harness keeps the useful parts of the original operating spec, now stated
+in `CLAUDE.md`:
 
-- no unapproved external monkey patches;
-- prefer existing modules/helpers over parallel systems;
-- propose subsystem refactors first;
-- define success criteria and run meaningful validation.
+- no unapproved patches to code outside the repo (Conventions);
+- prefer existing modules/helpers over parallel systems (Code stance, rule 5);
+- define success criteria and run meaningful validation (Conventions).
 
-These are judgment rules. They should guide behavior without turning every task
-into ceremony.
+"Propose subsystem refactors first" is replaced by the mode gate: the agent
+proposes `feat/`, `refactor/` or `fix/` and the user confirms.
+
+The conventions are judgment rules. They should guide behavior without turning
+every task into ceremony.
 
 ## 7. Skills And Plugins
 
-`tmux-control` is a standalone project skill because it is part of this harness.
+`tmux-control` and `dev-flow` are standalone project skills because they are
+part of this harness.
 `dx` and `superpowers` are copied as complete project-scope plugin directories
 because their repo-level glue files matter. Avoid flattening third-party plugin
 repos unless the loss of their root metadata is intentional and documented.
+
+`superpowers` is no longer a pristine copy. Local changes, all in skill text:
+
+- hand-offs return to `dev-flow` (`brainstorming`, `executing-plans`,
+  `subagent-driven-development`, `using-superpowers`);
+- `finishing-a-development-branch` is deleted; `dev-flow`'s Finalize step
+  replaces its four ways of finishing with one;
+- `test-driven-development` and `writing-plans` ask for the code the agreed
+  contract calls for, not the minimal code that passes the test;
+- `test-driven-development` and `systematic-debugging` name the red-test
+  verdict rule before a fix;
+- `writing-plans` has a Contract section and a migration table for refactors,
+  and no checkbox prefix on steps;
+- "without explicit user consent" is removed from the two lines about
+  starting work on `main`.
+
+The record of these changes is this repository's git history. An upstream
+update means re-applying them. Upstream's docs, tests, release notes and Codex
+reference inside the plugin are left as shipped, including their mentions of
+the deleted skill. The plugin's SessionStart injection is unchanged; it does
+not reach subagents, which is one reason rules live in `CLAUDE.md`.
 
 ## 8. Portability
 
@@ -144,6 +198,8 @@ Setup is considered correct when all are true:
 6. `git push`, `git reset --hard`, and `sudo` remain on the permissions `ask`
    list.
 7. Environment details live in `.claude/ENV.md`.
+8. A rule is stated once: `CLAUDE.md` for standing rules, `dev-flow` for the
+   order of work. Skills name a rule and do not restate it.
 
 ## 10. Maintenance Procedure
 

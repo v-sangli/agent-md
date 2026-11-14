@@ -266,9 +266,11 @@ for required in \
   rg -Fq "$required" "$REPO_DIR/CLAUDE.md" || policy_ok=0
 done
 for required in \
-  "Version: 3.0" \
+  "Version: 3.1" \
   "canonical rule source" \
   "The 3.0 Rollback" \
+  "The 3.1 Restructure" \
+  "dev-flow" \
   "tmux-control" \
   ".claude/ENV.md"; do
   rg -Fq "$required" "$REPO_DIR/.claude/policy/OPERATING_SPEC.md" || policy_ok=0
