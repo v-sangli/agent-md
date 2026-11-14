@@ -169,6 +169,8 @@ You MUST complete each phase before proceeding to the next.
 
 ### Phase 4: Implementation
 
+**Name the verdict first** (`CLAUDE.md`, "When a test is red"). Continue with the steps below only for a bug; any other verdict leaves this skill.
+
 **Fix the root cause, not the symptom:**
 
 1. **Create Failing Test Case**

@@ -222,17 +222,17 @@ fi
 
 claude_ok=1
 for required in \
+  "## Code stance" \
+  "### When a test is red" \
   "## Karpathy guidelines" \
-  "### 1. Think before coding" \
-  "### 2. Simplicity first" \
-  "### 3. Surgical changes" \
-  "### 4. Goal-driven execution"; do
+  "### Think before coding" \
+  "### Scope of a change"; do
   rg -Fq "$required" "$REPO_DIR/CLAUDE.md" || claude_ok=0
 done
 if [ "$claude_ok" -eq 1 ]; then
-  pass "CLAUDE.md contains distilled Karpathy guidance"
+  pass "CLAUDE.md contains the code stance and the kept Karpathy guidance"
 else
-  fail "CLAUDE.md contains distilled Karpathy guidance"
+  fail "CLAUDE.md contains the code stance and the kept Karpathy guidance"
 fi
 
 env_ok=1

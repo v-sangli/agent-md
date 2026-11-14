@@ -47,7 +47,7 @@ independently testable deliverable.
 **Each step is one action (2-5 minutes):**
 - "Write the failing test" - step
 - "Run it to make sure it fails" - step
-- "Implement the minimal code to make the test pass" - step
+- "Implement the code the contract calls for" - step
 - "Run the tests and make sure they pass" - step
 - "Commit" - step
 
@@ -105,7 +105,7 @@ def test_specific_behavior():
 Run: `pytest tests/path/test.py::test_name -v`
 Expected: FAIL with "function not defined"
 
-- [ ] **Step 3: Write minimal implementation**
+- [ ] **Step 3: Write the implementation the contract calls for**
 
 ```python
 def function(input):
