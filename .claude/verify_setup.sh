@@ -224,6 +224,7 @@ claude_ok=1
 for required in \
   "## Code stance" \
   "### When a test is red" \
+  "## Isolation and gates" \
   "## Karpathy guidelines" \
   "### Think before coding" \
   "### Scope of a change"; do

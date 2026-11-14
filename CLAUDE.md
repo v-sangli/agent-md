@@ -95,6 +95,38 @@ A red test is never just made green. Name the verdict first; it sets the route.
 - Docs describe the stable layer: contracts and decisions. Code, tests and `--help`
   document the wiring.
 
+## Isolation and gates
+
+Expect several collaborators, people and agents, working on a project at the same time, and
+keep development safe and separated. A feature is reviewable as one whole change, with the
+total context of the change and its diff.
+
+- Agree which code version the work is on before it starts: an existing branch or a new
+  one. `main` is never the working version.
+- One feature per branch. Features are not stacked into the same branch.
+- Worktrees are the default for feature branches: the root checkout stays on `main`, the
+  work happens in a worktree off it and returns by PR.
+- `worktree.bgIsolation: "none"` is set in user-scope `~/.claude/settings.json`, so background jobs write to real checkouts directly. That is deliberate. It must live at user scope because the guard is per-git-repo: this workspace root is not a repo, and each subdirectory (`omniteleop`, `dexdata`, `dexstream`, `Isaac-GR00T`, ...) is its own repo whose `.claude/settings.json` the agent cannot write once the guard is active.
+- Commit freely on the branch, one commit per logical change. Never commit on `main`.
+- `main` changes only by a squash-merged PR with green CI. Never rebase-merge.
+- Spec, plan and spike files live only on the feature branch and are deleted before merge.
+- Downstream repos pin by version.
+
+These need the user's word. The agent proposes, the user confirms.
+
+- **The mode**, which is the branch prefix. Switching mode mid-work is explicit.
+  - `feat/`: new behavior. Extending existing code goes through code stance rule 3.
+  - `refactor/`: behavior unchanged. The oracle passes with no test edited.
+  - `fix/`: surgical. A failing test comes first. Touch only what you must, and don't
+    refactor things that aren't broken.
+- **A spike.** Spikes are reconnaissance: directories inside the implementation branch
+  that serve as reference for the feature and never merge. Spike code does not edit core
+  or module files; it inherits and overrides them. Coding shortcuts are allowed there,
+  except `hasattr` and `getattr(obj, name, default)`. A monkey patch in a spike is allowed
+  but logged, each one as a missing extension point.
+- **An `exp/` branch**, the default home for experiment work. It must be explicitly
+  allowed by the user.
+
 ## Conventions
 
 As of 2026-07-26 the blocking hook enforcement is rolled back (see
@@ -135,8 +167,7 @@ them unless there is a concrete reason not to.
 - Do not patch `site-packages`, system paths, external dependency checkouts, or other outside-repo code without explicit approval.
 - Prefer in-repo fixes, dependency pins/upgrades, wrappers, or vendored patches.
 
-6. Change discipline.
-- Propose subsystem-level refactors first; use a worktree for non-trivial refactors when practical.
+6. Editing.
 - `Read` a file before `Write`/`Edit`. The tools reject an unread target, so
   guessing at contents costs a round-trip and buys nothing.
 
@@ -144,21 +175,6 @@ them unless there is a concrete reason not to.
 - Define success criteria before substantial edits.
 - Run the smallest meaningful validation after edits. Loop until verified.
 - For harness changes, `bash .claude/verify_setup.sh` is the baseline verifier.
-
-## Worktrees and commits
-
-These override any skill, tool description, or background-session guidance that says otherwise.
-
-**Worktrees are a judgement call, default off.**
-
-- Work directly in this workspace. Do not create or enter a worktree on your own initiative.
-- Only when the work is a major undertaking — broad cross-repo refactor, risky long-running migration, or parallel jobs that would collide on the same files — stop and ask whether a worktree is wanted. Do not enter one without agreement.
-- `worktree.bgIsolation: "none"` is set so background jobs write to real checkouts directly. That is deliberate. The guard is per-git-repo: when the workspace root is not itself a repo and holds several sub-repos, also set it in user-scope `~/.claude/settings.json`, because the agent cannot write a sub-repo's `.claude/settings.json` once the guard is active.
-
-**Do not commit unless asked.**
-
-- No `git commit`, `git commit --amend`, or `git push` unless I request it in that message.
-- This applies to plan checkpoints and end-of-task wrap-up too. Leave the work in the working tree and report what changed and where.
 
 ## Shell command shape
 
@@ -196,5 +212,3 @@ Before implementing:
 - If you notice unrelated dead code, mention it - don't delete it.
 - Remove imports, variables, and functions that your changes made unused.
 - Every changed line should trace directly to the user's request.
-- When fixing a bug: touch only what you must, and don't refactor things that aren't
-  broken.
