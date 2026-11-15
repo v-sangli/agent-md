@@ -12,11 +12,11 @@ structure, read `.claude/policy/OPERATING_SPEC.md` and record the decision there
 Scope: code design and development in any repo. Experiments follow their own provenance
 rules, which are not set here. These rules bind whoever writes the code, subagents included.
 
-1. **Defensive code.** Take full view of the repo's features and cover strictly those. Code
-   is straightforward: no elaborate compatibility checks, type checks or validity checks, no
-   fluff. Any erroneous behavior fails immediately and loudly; a tightly coupled
-   infrastructure does not need more. "Defensive" here never means guards and fallbacks:
-   those are the fluff this rule removes.
+1. **Lean, fail-loud code.** Take full view of the repo's features and cover strictly those.
+   The logic stays readable: no handlers, guards, fallbacks, or compatibility, type or
+   validity checks woven into it. Callers pass the agreed types; when they don't, the code
+   fails immediately and loudly. A handler inside the logic signals an end-to-end flow that
+   is not maintained: fix the flow, not the function. Rule 2 says where checks live.
 2. **Validate once, at the boundary; full trust inside.** Checks and validation are kept
    apart from the code's behavior. The first entry layer performs all checks.
    - Check code lives with the contract: each contract type carries its own checks, in its
