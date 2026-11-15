@@ -20,6 +20,7 @@ RULE SOURCES:
 - .claude/ENV.md identifies the default Python environment.
 
 POINTERS:
+- A code change in a repo starts with the dev-flow skill.
 - Use tmux-control when work needs visible shell execution.
 - Need sudo/root? FIRST option is always tmux-control root-request (user-owned
   session + `sudo -i` in the pane). Never `sudo tmux`; never opaque sudo.

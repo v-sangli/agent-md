@@ -37,14 +37,27 @@ side; mechanical checks belong to each repo's CI and branch protection, not to
 hooks here. What changed is where things live. Three homes, split by the kind of
 statement:
 
-- `CLAUDE.md` holds what is true whatever the task: the code stance, the
-  isolation rules and gates, the runtime conventions. It is always in context,
-  for subagents too, so it is the only home for a rule that constrains code.
+- `CLAUDE.md` holds what binds any code that gets written: the code stance,
+  the red-test verdict, the isolation rules and gates, the runtime conventions.
+  It is always in context, for the subagents that write code too (the built-in
+  Explore and Plan agents are the exception), so it is the only home for a rule
+  that constrains code. It stays under 200 lines; the verifier checks that.
 - `.claude/skills/dev-flow/` holds the order of work for a code change, from
-  request to merge, and the points where the user confirms. It states no rule
-  of its own.
+  request to merge. Each step establishes its concept: what it is for, what it
+  produces, who confirms it. `SKILL.md` carries every definition; its reference
+  files hold worked examples and templates only.
 - The vendored `superpowers` skills hold the technique for one step. Each skill
   used to require the next; those hand-offs now return to `dev-flow`.
+
+The test for every text is coverage: a concept the harness uses is either
+generally known, and then it is named with only our additions stated, or it is
+ours, and then it is established where a fresh session reads it.
+
+The template is environment-neutral. `CLAUDE.md` names no host, machine path
+or repo. One machine's own rules live in `CLAUDE.local.md` at the workspace
+root, which Claude Code loads alongside `CLAUDE.md`; it is not bundled or
+synced. `.claude/ENV.md` remains the one template file that is rewritten per
+machine.
 
 How the text is edited:
 
@@ -61,13 +74,14 @@ How the text is edited:
 ```text
 CLAUDE.md                         always-loaded rule source: code stance, isolation and gates,
                                   conventions (advisory), style
+CLAUDE.local.md                   one machine's own rules; loaded with CLAUDE.md, not in the template
 .claude/policy/OPERATING_SPEC.md  rationale, design notes, acceptance criteria
-.claude/skills/dev-flow/          order of work for a code change, request to merge
+.claude/skills/dev-flow/          order of work for a code change, request to merge;
+                                  references/ holds a worked sketch and the ADR template
 .claude/ENV.md                    environment identity and activation commands
 .claude/settings.json             SessionStart hook + broad permission grants
 .claude/hooks/session_start.sh    state reinjection at session start
 .claude/skills/tmux-control/      visible shell/root workflow helper
-.claude/skills/dx/                vendored Claude Code Tips plugin
 .claude/skills/superpowers/       vendored Superpowers plugin, locally amended (section 7)
 ```
 
@@ -150,9 +164,10 @@ every task into ceremony.
 
 `tmux-control` and `dev-flow` are standalone project skills because they are
 part of this harness.
-`dx` and `superpowers` are copied as complete project-scope plugin directories
-because their repo-level glue files matter. Avoid flattening third-party plugin
-repos unless the loss of their root metadata is intentional and documented.
+`superpowers` is copied as a complete project-scope plugin directory because
+its repo-level glue files matter. Avoid flattening third-party plugin repos
+unless the loss of their root metadata is intentional and documented. The
+vendored `dx` plugin was removed on 2026-11-13.
 
 `superpowers` is no longer a pristine copy. Local changes, all in skill text:
 
@@ -164,8 +179,14 @@ repos unless the loss of their root metadata is intentional and documented.
   contract calls for, not the minimal code that passes the test;
 - `test-driven-development` and `systematic-debugging` name the red-test
   verdict rule before a fix;
-- `writing-plans` has a Contract section and a migration table for refactors,
-  and no checkbox prefix on steps;
+- `systematic-debugging` states investigation before a fix as a strong
+  preference with room for judgement, not as a law;
+- the `defense-in-depth` technique is removed from `systematic-debugging`: it
+  asks for validation at every layer, and the code stance validates once, at
+  the boundary;
+- `writing-plans` has a Contract section (Decision, signatures, variation
+  axes) and a migration table for refactors, and no checkbox prefix on steps;
+- `brainstorming` names what `dev-flow` step 4 asks of a spec;
 - "without explicit user consent" is removed from the two lines about
   starting work on `main`.
 
@@ -202,6 +223,9 @@ Setup is considered correct when all are true:
 7. Environment details live in `.claude/ENV.md`.
 8. A rule is stated once: `CLAUDE.md` for standing rules, `dev-flow` for the
    order of work. Skills name a rule and do not restate it.
+9. `CLAUDE.md` is under 200 lines and names no host, machine path or repo.
+10. Every concept `CLAUDE.md` or `dev-flow` uses is generally known or is
+    established in one of the two.
 
 ## 10. Maintenance Procedure
 

@@ -68,7 +68,7 @@ This checks:
 - `jq`, `rg`, and `realpath` are available
 - standalone project skills and vendored project-scope plugins are installed under `.claude/skills/`
 - `tmux-control` is installed in `.claude/skills/tmux-control/`
-- Claude Code Tips is installed as `.claude/skills/dx/`, preserving its plugin namespace and repo glue files.
+- `dev-flow` is installed in `.claude/skills/dev-flow/`, with its two reference files
 - Superpowers is installed as `.claude/skills/superpowers/`, preserving its plugin namespace and repo glue files.
 - settings.json is advisory: `SessionStart`/`SessionEnd` only, no blocking hooks, no machine-specific absolute paths
 - session bootstrap works
@@ -83,11 +83,9 @@ Requires working Claude login/org entitlement. If `.claude/skills/` was created 
 Inside Claude Code:
 
 - `/memory` should show the intended project `CLAUDE.md`.
-- `/` should show project skills such as `tmux-control`.
+- `/` should show project skills such as `tmux-control` and `dev-flow`.
 - Direct project skill invocations such as `/tmux-control` should resolve.
-- Plugin-scoped Claude Code Tips invocations such as `/dx:handoff` should resolve from `.claude/skills/dx/`.
 - Plugin-scoped Superpowers invocations such as `/superpowers:using-superpowers` and `/superpowers:brainstorming` should resolve.
-- `claude plugin list` should show `dx@skills-dir` loaded from `.claude/skills/dx/`.
 - If user-scope `superpowers@claude-plugins-official` is enabled, Claude Code will use that and report the copied `.claude/skills/superpowers/` plugin as not loaded because the name is already taken.
 - If `claude plugin list` says skills-dir plugins were not loaded because the workspace is not trusted, accept the workspace trust prompt in an interactive Claude Code session, then run `/reload-plugins` or restart.
 - To test copied Superpowers instead of user-scope Superpowers, disable or uninstall the user-scope plugin first.
@@ -108,3 +106,4 @@ Inside Claude Code:
 - `.claude/policy/` contains the current lean runtime rules and operating specification. It intentionally does not restore the old `.claude-log`, `.claude-tools`, or hash-drift runtime.
 - `.claude/ENV.md` contains the default Python environment contract, and is the one file expected to be machine-specific. On a new machine, rewrite it to name that machine's activation script and environment; everything else in `.claude/` is meant to be portable as-is.
 - `.claude-log` and `.claude-tools` are intentionally not part of this lean setup.
+- `CLAUDE.md` is part of the template and names no host, machine path or repo. One machine's own rules go in `CLAUDE.local.md` at the workspace root, which Claude Code loads alongside `CLAUDE.md`. That file is not bundled and not synced; write it per machine.

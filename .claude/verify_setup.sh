@@ -102,16 +102,13 @@ need_file ".claude/policy/OPERATING_SPEC.md"
 need_file ".claude/settings.json"
 need_file ".claude/hooks/session_start.sh"
 need_file ".claude/skills/dev-flow/SKILL.md"
+need_file ".claude/skills/dev-flow/references/interface-sketch.md"
+need_file ".claude/skills/dev-flow/references/adr-template.md"
 need_file ".claude/skills/tmux-control/SKILL.md"
 need_file ".claude/skills/tmux-control/references/commands.md"
 need_file ".claude/skills/tmux-control/references/sudo.md"
 need_file ".claude/skills/tmux-control/references/validation.md"
 need_file ".claude/skills/tmux-control/scripts/tmux_control.sh"
-need_file ".claude/skills/dx/.claude-plugin/plugin.json"
-need_file ".claude/skills/dx/CLAUDE.md"
-need_file ".claude/skills/dx/GLOBAL-CLAUDE.md"
-need_file ".claude/skills/dx/skills/handoff/SKILL.md"
-need_file ".claude/skills/dx/skills/clone/SKILL.md"
 need_file ".claude/skills/superpowers/.claude-plugin/plugin.json"
 need_file ".claude/skills/superpowers/CLAUDE.md"
 need_file ".claude/skills/superpowers/AGENTS.md"
@@ -151,9 +148,11 @@ need_exec ".claude/skills/tmux-control/scripts/tmux_control.sh"
 # Portability: this harness is a general template. Only .claude/ENV.md may name
 # one machine's paths or environments — everything else must resolve through
 # $CLAUDE_PROJECT_DIR or a relative path. Vendored plugins are upstream content
-# and settings.local.json is machine-local, so both are out of scope.
-env_leaks="$(rg -l --no-messages '/home/[a-zA-Z]|/Users/[a-zA-Z]' "$REPO_DIR/.claude" \
-  -g '!**/skills/dx/**' -g '!**/skills/superpowers/**' \
+# and settings.local.json is machine-local, so both are out of scope. CLAUDE.md
+# is part of the template and is scanned too; one machine's rules live in
+# CLAUDE.local.md, which is not.
+env_leaks="$(rg -l --no-messages '/home/[a-zA-Z]|/Users/[a-zA-Z]' "$REPO_DIR/.claude" "$REPO_DIR/CLAUDE.md" \
+  -g '!**/skills/superpowers/**' \
   -g '!**/ENV.md' -g '!**/settings.local.json' || true)"
 if [ -z "$env_leaks" ]; then
   pass "harness is machine-portable: absolute home paths confined to ENV.md"
@@ -212,9 +211,8 @@ shopt -u nullglob
 
 if printf '%s' "$standalone_names" | rg -qx 'tmux-control' &&
   printf '%s' "$standalone_names" | rg -qx 'dev-flow' &&
-  [ "$plugin_skill_count" -ge 21 ] &&
+  [ "$plugin_skill_count" -ge 13 ] &&
   printf '%s' "$plugin_skill_names" | rg -qx 'superpowers:using-superpowers' &&
-  printf '%s' "$plugin_skill_names" | rg -qx 'dx:handoff' &&
   [ "$skill_bad" -eq 0 ]; then
   pass "standalone skills and project-scope plugins have Claude-compatible metadata"
 else
@@ -227,14 +225,23 @@ for required in \
   "### When a test is red" \
   "## Isolation and gates" \
   "## Karpathy guidelines" \
-  "### Think before coding" \
-  "### Scope of a change"; do
+  "**Think before coding.**" \
+  "**Scope of a change.**"; do
   rg -Fq "$required" "$REPO_DIR/CLAUDE.md" || claude_ok=0
 done
 if [ "$claude_ok" -eq 1 ]; then
   pass "CLAUDE.md contains the code stance and the kept Karpathy guidance"
 else
   fail "CLAUDE.md contains the code stance and the kept Karpathy guidance"
+fi
+
+# CLAUDE.md is loaded into every session and every subagent. Past about 200
+# lines adherence drops, so growth has to be paid for by moving text out.
+claude_lines="$(wc -l <"$REPO_DIR/CLAUDE.md")"
+if [ "$claude_lines" -lt 200 ]; then
+  pass "CLAUDE.md is under 200 lines ($claude_lines)"
+else
+  fail "CLAUDE.md is under 200 lines ($claude_lines)"
 fi
 
 env_ok=1
