@@ -217,11 +217,14 @@ Turns the branch into one reviewable change. In this order:
 4. **Deviations.** Each deviation the change leaves behind has its row in `DEVIATIONS.md`
    and its `DEVIATION(<id>)` comment at every code site. Remove the rows whose exit
    condition this change met.
+   - **Patch ref** says where an edit to code we do not own lives: the fork, branch and
+     commit that carry it, or the vendored patch file. It is `-` when the deviation
+     touches only our own code. An edit to an external repo is never left untraced.
 
    ```markdown
-   | Id | Where | Why | Exit condition |
-   |---|---|---|---|
-   | D-001 | `readers/csv.py::CsvReader.read` | The upstream parser drops the last row of a file with no trailing newline (link to its issue). | An upstream release with the fix: remove the workaround and this row. |
+   | Id | Where | Why | Patch ref | Exit condition |
+   |---|---|---|---|---|
+   | D-001 | `readers/csv.py::CsvReader.read` | The upstream parser drops the last row of a file with no trailing newline (link to its issue). | `our-org/csvparse` fork, branch `fix/trailing-newline`, commit `a1b2c3d` | An upstream release with the fix: remove the workaround, the fork pin and this row. |
    ```
 5. **Delete the branch-only files:** the spec, the plan and `spikes/`. They stay readable
    in the PR's commits. Tracked code and docs cite none of them.

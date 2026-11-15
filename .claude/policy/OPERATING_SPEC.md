@@ -209,7 +209,10 @@ vendored `dx` plugin was removed on 2026-11-13.
   axes) and a migration table for refactors, and no checkbox prefix on steps;
 - `brainstorming` names what `dev-flow` step 4 asks of a spec;
 - "without explicit user consent" is removed from the two lines about
-  starting work on `main`.
+  starting work on `main`;
+- `subagent-driven-development` (Model Selection, BLOCKED handling, and its
+  implementer and task-reviewer prompts) dispatches every role on opus instead
+  of tiering models by difficulty (2026-11-09).
 
 The record of these changes is this repository's git history. An upstream
 update means re-applying them. The plugin's README, its Codex reference and one

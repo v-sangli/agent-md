@@ -47,7 +47,7 @@ rules, which are not set here. These rules bind whoever writes the code, subagen
    its replacement, or a fallback kept on purpose. The most dangerous ones are the
    untracked ones.
    - The registry is `DEVIATIONS.md` at the repo root: one row per deviation (id, where,
-     why, exit condition). Each code site carries a `DEVIATION(<id>)` comment.
+     why, patch ref, exit condition). Each code site carries a `DEVIATION(<id>)` comment.
    - On a bug in code we do not own, decide: relay it upstream, move on with it
      registered, or treat it as a feature gap in our own infrastructure (rule 3).
    - Patching is for other people's bugs, not for coordinating with ourselves. In our own
