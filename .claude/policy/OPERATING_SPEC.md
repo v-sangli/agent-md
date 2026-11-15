@@ -69,6 +69,26 @@ How the text is edited:
 - A skill may name a rule at the moment it applies, in one line. It does not
   restate it.
 
+## 0.2 Porting 3.1 Onto the Template
+
+The 3.1 restructure was written on another machine, on top of that machine's
+copy of the harness, which predated the template's 2026-11-09 changes. On
+2026-11-14 it was ported onto the template. Where the two disagreed:
+
+- Isolation and gates (worktrees by default, commits on the feature branch)
+  come from 3.1, as intended there.
+- tmux comes from the template: the root session is user-owned and escalated
+  in-pane with `sudo -i` (not a shared `sudo tmux -S` socket, whose server is
+  root-owned); sessions carry `@claude_session` and `@role` pane options;
+  `stop`, `cleanup` and the `SessionEnd` hook (`cleanup --idle-only`) reap
+  only the calling session's own sessions.
+- Every subagent runs on opus, stated in `CLAUDE.md` and in the vendored
+  `subagent-driven-development` skill; models are not tiered by difficulty.
+- The other machine's GMI guard hook and its `CLAUDE.local.md` stay on that
+  machine. `CLAUDE.local.md` is git-ignored here.
+- `HARNESS_CHECKLIST.md` is retired; decisions are recorded in this file. Its
+  past entries stay in git history.
+
 ## 1. File Roles
 
 ```text
@@ -79,8 +99,9 @@ CLAUDE.local.md                   one machine's own rules; loaded with CLAUDE.md
 .claude/skills/dev-flow/          order of work for a code change, request to merge;
                                   references/ holds a worked sketch and the ADR template
 .claude/ENV.md                    environment identity and activation commands
-.claude/settings.json             SessionStart hook + broad permission grants
+.claude/settings.json             SessionStart/SessionEnd hooks + broad permission grants
 .claude/hooks/session_start.sh    state reinjection at session start
+.claude/hooks/session_end.sh      safety-net cleanup of this session's idle tmux sessions
 .claude/skills/tmux-control/      visible shell/root workflow helper
 .claude/skills/superpowers/       vendored Superpowers plugin, locally amended (section 7)
 ```

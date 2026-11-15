@@ -146,26 +146,26 @@ Conventions and defaults, not gates: no tool call is blocked (see
 - **Workspace boundary.** Write/delete work stays inside the repo unless the user grants
   external scope. Treat `.claude/**` as setup configuration: edit it for harness
   maintenance, not as part of ordinary task work.
-- **Shell execution.** Direct Bash is fine for any command, including writes, deletes, and
-  `rm -rf` inside the workspace. Prefer `tmux-control` for tests, installs, builds,
-  benchmarks, nested agents, and long-running work: the user gets a visible, attachable
-  session and a durable log. This is encouragement, not a gate. Invoke helper scripts with
-  absolute paths, or `cd` to the workspace root first: the persistent shell cwd drifts
-  between Bash calls. Do not poll with a foreground `sleep`; the harness blocks it. Wait on
-  a condition with `tmux_control.sh wait` or the `Monitor` tool.
-- **Privilege.** Prefer the `tmux-control` root-request flow for sudo work: Claude Code's
-  opaque shell cannot surface password prompts. Default to a shared root tmux session: the
-  user opens it and grants this user access, the agent drives it while the user watches and
-  closes it when the scoped task is done. Plain `sudo` prompts through permissions;
-  acceptable when the user is present and the command is short.
+- **Shell execution.** Direct Bash is fine for any command, `rm -rf` inside the workspace
+  included. Prefer `tmux-control` for tests, installs, builds, benchmarks, nested agents and
+  long-running work: a visible, attachable session and a durable log; this is
+  encouragement, not a gate. Invoke helper scripts by absolute path or from the workspace
+  root: the shell cwd drifts between calls. Never poll with a foreground `sleep`; wait with `tmux_control.sh
+  wait` or `Monitor`. Stop every tmux session you started when its work is done
+  (`stop`/`cleanup`), never one you did not.
+- **Privilege.** For sudo/root, offer the `tmux-control` root session first
+  (`tmux_control.sh root-request`): the opaque shell cannot surface password prompts. It is
+  a user-owned session escalated in-pane with `sudo -i`, never `sudo tmux` (a root-owned
+  server the agent cannot reach). Send nothing before `^root@`; `stop` it when done.
+- **Subagent models.** Dispatch every subagent with `model: opus`. Do not tier models by
+  task difficulty: better first implementations mean less debugging.
 - **Environment.** Read `.claude/ENV.md` before Python, pytest, uv, dependency, install,
   or build work, and use the default environment it names unless the user overrides it.
   Do not use `PYTHONPATH=.` as a durable fix.
 - **Code outside the repo.** Do not patch `site-packages`, system paths, external
   dependency checkouts, or other outside-repo code without explicit approval. Prefer
   in-repo fixes, dependency pins/upgrades, wrappers, or vendored patches.
-- **Editing.** `Read` a file before `Write`/`Edit`. The tools reject an unread target, so
-  guessing at contents costs a round-trip and buys nothing.
+- **Editing.** `Read` a file before `Write`/`Edit`; the tools reject an unread target.
 - **Verification.** Define success criteria before substantial edits. Run the smallest
   meaningful validation after edits, and loop until verified. For harness changes,
   `bash .claude/verify_setup.sh` is the baseline verifier.
