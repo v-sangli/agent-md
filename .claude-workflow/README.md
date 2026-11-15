@@ -15,7 +15,6 @@ The bundle script includes portable configuration and skills:
 - `.claude/`
 - `.claude-workflow/`
 - `CLAUDE.md`
-- `HARNESS_CHECKLIST.md`
 
 `.claude-log/` and `.claude-tools/` are intentionally excluded.
 Python cache files are excluded from the archive.

@@ -7,7 +7,7 @@ description: Use when implementing any feature or bugfix, before writing impleme
 
 ## Overview
 
-Write the test first. Watch it fail. Write minimal code to pass.
+Write the test first. Watch it fail. Write the code the agreed contract calls for, and nothing beyond it.
 
 **Core principle:** If you didn't watch the test fail, you don't know if it tests the right thing.
 
@@ -51,7 +51,7 @@ digraph tdd_cycle {
     rankdir=LR;
     red [label="RED\nWrite failing test", shape=box, style=filled, fillcolor="#ffcccc"];
     verify_red [label="Verify fails\ncorrectly", shape=diamond];
-    green [label="GREEN\nMinimal code", shape=box, style=filled, fillcolor="#ccffcc"];
+    green [label="GREEN\nCode to the contract", shape=box, style=filled, fillcolor="#ccffcc"];
     verify_green [label="Verify passes\nAll green", shape=diamond];
     refactor [label="REFACTOR\nClean up", shape=box, style=filled, fillcolor="#ccccff"];
     next [label="Next", shape=ellipse];
@@ -127,9 +127,9 @@ Confirm:
 
 **Test errors?** Fix error, re-run until it fails correctly.
 
-### GREEN - Minimal Code
+### GREEN - Code to the Contract
 
-Write simplest code to pass the test.
+Write the code the agreed contract calls for, and nothing beyond it. The passing test is the check, not the target: code shaped only to satisfy the test is a patch.
 
 <Good>
 ```typescript
@@ -144,7 +144,7 @@ async function retryOperation<T>(fn: () => Promise<T>): Promise<T> {
   throw new Error('unreachable');
 }
 ```
-Just enough to pass
+Nothing beyond what was asked
 </Good>
 
 <Bad>
@@ -180,7 +180,7 @@ Confirm:
 
 **Test fails?** Fix code, not test.
 
-**Other tests fail?** Fix now.
+**Other tests fail?** Name the verdict before any fix (`CLAUDE.md`, "When a test is red").
 
 ### REFACTOR - Clean Up
 
@@ -331,7 +331,7 @@ Before marking work complete:
 - [ ] Every new function/method has a test
 - [ ] Watched each test fail before implementing
 - [ ] Each test failed for expected reason (feature missing, not typo)
-- [ ] Wrote minimal code to pass each test
+- [ ] Wrote the code the contract calls for, nothing beyond it
 - [ ] All tests pass
 - [ ] Output pristine (no errors, warnings)
 - [ ] Tests use real code (mocks only if unavoidable)

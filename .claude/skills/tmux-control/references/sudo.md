@@ -1,7 +1,7 @@
 # Sudo And Root Terminal Policy
 
-This reference expands `.claude/policy/AGENT_RULES.md` for privileged tmux
-workflows. If wording drifts, `AGENT_RULES.md` is the canonical source.
+This reference expands the Privilege convention in `CLAUDE.md` for privileged tmux
+workflows. If wording drifts, `CLAUDE.md` is the canonical source.
 
 ## Problem
 

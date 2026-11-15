@@ -30,5 +30,5 @@ which python
 ## Notes
 
 - A package resolves to its installed location in the env, not to your cwd; before trusting a worktree's tests, confirm it resolves to that worktree (`python -c "import <pkg>; print(<pkg>.__file__)"`).
-- This file identifies the environment. Runtime behavior rules live in `.claude/policy/AGENT_RULES.md`.
+- This file identifies the environment. Runtime behavior rules live in `CLAUDE.md` (Conventions).
 - If the default environment changes, update this file and the policy references together.
