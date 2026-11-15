@@ -75,9 +75,11 @@ include this section.]
 
 ## Contract
 
-[What was agreed at the interface checkpoint, copied unchanged.
-- Decision: what was agreed at the checkpoint, in a sentence or two.
-- Signatures: the agreed signatures and frozen dataclasses, no bodies.
+[What was agreed at the interface checkpoint.
+- Decision: what was agreed, in a sentence or two.
+- Sketch: the agreed sketch, copied unchanged: the objects with their
+  signatures, the data that crosses between them, the directory layout, and
+  the variant N+1 example.
 - Variation axes: which of the repo's axes the change is generic over, and
   which it deliberately fixes.
 Tasks implement this contract and add nothing to it.]

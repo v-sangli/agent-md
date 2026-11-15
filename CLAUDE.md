@@ -25,7 +25,7 @@ rules, which are not set here. These rules bind whoever writes the code, subagen
    - "Once" means once each time data crosses a public boundary. A function that outside
      callers invoke repeatedly is an entry on each call. Re-checking inside, after the data
      is in, is banned.
-   - A test runs the entry phase over every config in the repo.
+   - A test runs the entry layer's checks over every config in the repo.
 3. **A feature gap is covered by a top-down edit, never patched in place.** Ask explicitly
    what the feature is and how the repo should support it. The edit may be minimal or
    major; that is up to discussion, case by case. It takes one of three shapes:
@@ -43,15 +43,16 @@ rules, which are not set here. These rules bind whoever writes the code, subagen
    rather than add hotfixes. Extend existing modules and helpers before adding parallel
    systems.
 6. **Every deviation is registered with a reason and an exit condition.** A deviation is a
-   patch for someone else's bug, a temporary standalone, an old path kept beside its
-   replacement, or a silent fallback. The most dangerous ones are the untracked ones.
+   patch for a bug in code we do not own, a temporary standalone, an old path kept beside
+   its replacement, or a fallback kept on purpose. The most dangerous ones are the
+   untracked ones.
    - The registry is `DEVIATIONS.md` at the repo root: one row per deviation (id, where,
      why, exit condition). Each code site carries a `DEVIATION(<id>)` comment.
-   - When one is found, decide: relay it upstream, move on with it registered, or treat it
-     as a feature gap in our own infrastructure (rule 3).
-   - The registry is for other people's bugs, not for coordinating with ourselves. In our
-     own code there is no "patch first, consolidate later": a feature gap or design gap
-     goes through rule 3 before code, and nothing is injected into the core.
+   - On a bug in code we do not own, decide: relay it upstream, move on with it
+     registered, or treat it as a feature gap in our own infrastructure (rule 3).
+   - Patching is for other people's bugs, not for coordinating with ourselves. In our own
+     code there is no "patch first, consolidate later": a feature gap or design gap goes
+     through rule 3 before code, and nothing is injected into the core.
 7. **A frozen core is a settled typed contract, an oracle and CI.** It exists so that
    features and implementations use and reuse one core, instead of monkey patching without
    checking compatibility.
@@ -59,8 +60,8 @@ rules, which are not set here. These rules bind whoever writes the code, subagen
      pins. Everything else may churn. A contract freezes only once it is settled.
    - The oracle is the set of tests that pin the current behavior of a piece of code:
      golden outputs, parity against a reference, an API snapshot.
-   - A frozen core changes only by refactor or by an end-to-end feature addition. A
-     refactor passes the oracle with no test edited.
+   - A frozen core changes only by refactor or by an end-to-end feature addition (full
+     integration, rule 3). A refactor passes the oracle with no test edited.
 8. **Every repo runs tests, lint and invariant checks in CI.** An ADR rule that can be
    tested becomes a CI test.
 9. **Modular, object-driven, structured by subdirectory; rigid at the variation axes.**
@@ -95,7 +96,7 @@ A red test is never just made green. Name the verdict first; it sets the route.
 
 - The expected failure of a test just written for the task at hand needs no verdict.
 - A refactor edits no test: a stale test found during one means it is not a refactor.
-- Someone else's bug is a deviation (rule 6).
+- A bug in code we do not own is a deviation (rule 6).
 - An implementer subagent acts alone only on a bug inside its own task. On any other
   verdict it stops and reports.
 
@@ -114,29 +115,28 @@ total context of the change and its diff.
 - `main` changes only by a squash-merged PR with green CI. Never rebase-merge.
 - Spec, plan and spike files live only on the feature branch and are deleted before merge.
 
-Three things need the user's word. The agent proposes, the user confirms.
+Four things need the user's word. The agent proposes, the user confirms.
 
 - **The mode**, which is also the branch prefix. It says where the change sits relative to
   an existing design. Switching mode mid-work is explicit and goes back to the user.
-  - `feat/`, greenfield: no design exists yet. The design is made first, then built.
-  - `feat/`, extend: a design exists and the feature is new to it. Rule 3 picks the shape.
-    A frozen core is touched only by full integration.
+  - `feat/`: new behavior. Where a design already exists, rule 3 picks the shape, and a
+    frozen core is touched only by full integration.
   - `refactor/`: behavior stays the same. The oracle passes with no test edited; where
     there is no oracle, one is written first, before any code changes.
   - `fix/`: the design is trusted and the code departs from it. A failing test comes
     first. The fix is surgical: touch only what you must, and don't refactor things that
     aren't broken. Prefer investigating the cause before any fix: a preference with room
     for judgement, not a law. A fix that exposes a design gap stops and changes mode.
+- **The interface sketch**, agreed before any plan is written.
 - **A spike.** Spikes are reconnaissance: directories under `spikes/` inside the
   implementation branch, which serve as reference for the feature and never merge. Spike
   code does not edit core or module files; it inherits and overrides them. Coding shortcuts
   are allowed there, except `hasattr` and `getattr(obj, name, default)`. A monkey patch in
   a spike is allowed but logged, each one as a missing extension point.
-- **An `exp/` branch**, the default home for experiment work. It must be explicitly
-  allowed by the user.
+- **An `exp/` branch**, the default home for experiment work. It must be allowed explicitly.
 
-Any code change in a repo goes through the `dev-flow` skill: the order of work from request
-to merge, with what each step is for, what it produces and who confirms it.
+Any code change in a repo, an allowed `exp/` branch aside, goes through the `dev-flow`
+skill: the order of work from request to merge, what each step produces and who confirms it.
 
 ## Conventions
 

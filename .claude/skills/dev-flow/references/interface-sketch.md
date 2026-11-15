@@ -4,6 +4,7 @@ What a sketch looks like at the interface checkpoint (dev-flow step 5). The exam
 Python; the same content carries to any language.
 
 Request: "Load tabular files into memory. CSV now; a second format is expected."
+Mode: `feat/` greenfield.
 
 ## Variation axes
 
@@ -48,6 +49,10 @@ class Loader:
 
     def __init__(self, reader: CsvReader) -> None: ...
     def load(self, request: LoadRequest) -> Table: ...
+
+
+def load_csv(request: LoadRequest, options: CsvOptions) -> Table: ...
+    # the public entry point: builds Loader(CsvReader(options)) and calls load
 ```
 
 The seam at the file-format axis is the one call `reader.read(path, columns) -> Table`.
@@ -58,6 +63,7 @@ base class, registry or format switch, because a second format is not real yet.
 
 ```text
 tabular/
+  api.py            load_csv: the public entry point
   core/
     table.py        Table
   loading/
@@ -72,14 +78,19 @@ tests/
 
 ## Adding variant N+1
 
-Adding a Parquet reader, once it is real:
+Adding a Parquet reader, once it is real. It is an extension, and its intake shape is full
+integration.
 
 - **Touches:** `readers/parquet.py` (new, with the same `read` signature);
-  `readers/__init__.py` (a `TableReader` protocol is declared now, because there are two
-  readers); `loading/loader.py` (the reader's type becomes `TableReader`); the place that
-  constructs the `Loader`.
+  `readers/reader.py` (new: the `TableReader` protocol, and the one function that picks a
+  reader from the file's suffix); `loading/loader.py` (the reader's type becomes
+  `TableReader`); `api.py` (the entry point uses the picking function).
 - **Does not touch:** `core/table.py`, `loading/request.py`, `readers/csv.py`, or any test
   of the CSV path.
+
+The protocol and the picking function are built at this point and not before: with two
+variants real they are the interface, and with one they would be machinery ahead of its
+case.
 
 ## What the user decides here
 
