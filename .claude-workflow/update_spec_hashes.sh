@@ -10,7 +10,6 @@ command -v jq >/dev/null 2>&1 || {
 
 files=(
   "CLAUDE.md"
-  "HARNESS_CHECKLIST.md"
   ".claude/access.conf"
   ".claude/settings.json"
   ".claude/harness/run.sh"

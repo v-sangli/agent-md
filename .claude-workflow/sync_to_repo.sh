@@ -41,7 +41,7 @@ RSYNC_FLAGS=(-a --checksum --delete)
 rsync "${RSYNC_FLAGS[@]}" "${EXCLUDES[@]}" "$ROOT_DIR/.claude/" "$REPO_DIR/.claude/"
 rsync "${RSYNC_FLAGS[@]}" "${EXCLUDES[@]}" "$ROOT_DIR/.claude-workflow/" "$REPO_DIR/.claude-workflow/"
 if [ "$DRY_RUN" = "0" ]; then
-  cp -p "$ROOT_DIR/CLAUDE.md" "$ROOT_DIR/HARNESS_CHECKLIST.md" "$REPO_DIR/"
+  cp -p "$ROOT_DIR/CLAUDE.md" "$REPO_DIR/"
 fi
 
 if [ "$DRY_RUN" = "1" ]; then
