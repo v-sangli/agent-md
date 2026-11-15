@@ -211,7 +211,7 @@ The Pi package loads the Superpowers skills and a small extension that injects t
 - **test-driven-development** - RED-GREEN-REFACTOR cycle (includes testing anti-patterns reference)
 
 **Debugging**
-- **systematic-debugging** - 4-phase root cause process (includes root-cause-tracing, defense-in-depth, condition-based-waiting techniques)
+- **systematic-debugging** - 4-phase root cause process (includes root-cause-tracing, condition-based-waiting techniques)
 - **verification-before-completion** - Ensure it's actually fixed
 
 **Collaboration** 

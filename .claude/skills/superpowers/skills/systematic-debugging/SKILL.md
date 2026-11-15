@@ -9,17 +9,15 @@ description: Use when encountering any bug, test failure, or unexpected behavior
 
 Random fixes waste time and create new bugs. Quick patches mask underlying issues.
 
-**Core principle:** ALWAYS find root cause before attempting fixes. Symptom fixes are failure.
+**Core principle:** Find the root cause before attempting a fix. Symptom fixes are failure.
 
-**Violating the letter of this process is violating the spirit of debugging.**
-
-## The Iron Law
+## The Default
 
 ```
-NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST
+INVESTIGATE THE CAUSE BEFORE YOU FIX
 ```
 
-If you haven't completed Phase 1, you cannot propose fixes.
+This is a strong preference with room for judgement, not a law. When the cause is plain from the error itself, say what it is and fix it. When you are guessing, you have left that room: go back to Phase 1.
 
 ## When to Use
 
@@ -45,7 +43,7 @@ Use for ANY technical issue:
 
 ## The Four Phases
 
-You MUST complete each phase before proceeding to the next.
+Work through the phases in order.
 
 ### Phase 1: Root Cause Investigation
 
@@ -272,7 +270,7 @@ If systematic investigation reveals issue is truly environmental, timing-depende
 
 1. You've completed the process
 2. Document what you investigated
-3. Implement appropriate handling (retry, timeout, error message)
+3. Implement appropriate handling (retry, timeout, error message). A retry or any other silent recovery is a deviation: register it (`CLAUDE.md`, code stance rule 6)
 4. Add monitoring/logging for future investigation
 
 **But:** 95% of "no root cause" cases are incomplete investigation.
@@ -282,7 +280,6 @@ If systematic investigation reveals issue is truly environmental, timing-depende
 These techniques are part of systematic debugging and available in this directory:
 
 - **`root-cause-tracing.md`** - Trace bugs backward through call stack to find original trigger
-- **`defense-in-depth.md`** - Add validation at multiple layers after finding root cause
 - **`condition-based-waiting.md`** - Replace arbitrary timeouts with condition polling
 
 **Related skills:**

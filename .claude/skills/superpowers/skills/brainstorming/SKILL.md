@@ -105,6 +105,7 @@ digraph brainstorming {
 
 - Write the validated design (spec) to `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`
   - (User preferences for spec location override this default)
+- In a repo, the spec also states what dev-flow step 4 asks for: the contract, the variation axes, the intake shape for an extension, and for a refactor the consumer map and the oracle
 - Use elements-of-style:writing-clearly-and-concisely skill if available
 - Commit the design document to git
 

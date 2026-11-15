@@ -14,12 +14,12 @@ digraph when_to_use {
     "Can trace backwards?" [shape=diamond];
     "Fix at symptom point" [shape=box];
     "Trace to original trigger" [shape=box];
-    "BETTER: Also add defense-in-depth" [shape=box];
+    "Add the check once, at the entry boundary" [shape=box];
 
     "Bug appears deep in stack?" -> "Can trace backwards?" [label="yes"];
     "Can trace backwards?" -> "Trace to original trigger" [label="yes"];
     "Can trace backwards?" -> "Fix at symptom point" [label="no - dead end"];
-    "Trace to original trigger" -> "BETTER: Also add defense-in-depth";
+    "Trace to original trigger" -> "Add the check once, at the entry boundary";
 }
 ```
 
@@ -121,11 +121,7 @@ Runs tests one-by-one, stops at first polluter. See script for usage.
 
 **Fix:** Made tempDir a getter that throws if accessed before beforeEach
 
-**Also added defense-in-depth:**
-- Layer 1: Project.create() validates directory
-- Layer 2: WorkspaceManager validates not empty
-- Layer 3: NODE_ENV guard refuses git init outside tmpdir
-- Layer 4: Stack trace logging before git init
+**The check goes in once, at the entry boundary:** Project.create() validates the directory. No further layers are added behind it (`CLAUDE.md`, code stance rule 2).
 
 ## Key Principle
 

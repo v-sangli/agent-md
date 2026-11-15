@@ -13,7 +13,7 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 **Announce at start:** "I'm using the writing-plans skill to create the implementation plan."
 
-**Context:** The feature branch and its worktree already exist before the plan is written (dev-flow step 2, via the `superpowers:using-git-worktrees` skill).
+**Context:** The feature branch and its worktree already exist before the plan is written (dev-flow step 2, via the `superpowers:using-git-worktrees` skill), and the interface sketch is agreed (dev-flow step 5).
 
 **Save plans to:** `docs/superpowers/plans/YYYY-MM-DD-<feature-name>.md`
 - (User preferences for plan location override this default)
@@ -76,7 +76,7 @@ include this section.]
 ## Contract
 
 [What was agreed at the interface checkpoint, copied unchanged.
-- Verdict: the decision this plan carries out, in a sentence or two.
+- Decision: what was agreed at the checkpoint, in a sentence or two.
 - Signatures: the agreed signatures and frozen dataclasses, no bodies.
 - Variation axes: which of the repo's axes the change is generic over, and
   which it deliberately fixes.
