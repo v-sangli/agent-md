@@ -67,8 +67,8 @@ What each mode demands of the code is in `CLAUDE.md` (Isolation and gates).
 - In the proposal, say which steps you expect to leave out and why, and name any CI check
   the repo lacks (see "The CI checks the rules lean on"). The user confirms these together
   with the mode.
-- A switch of mode mid-work is explicit: stop, say what was found, and come back to this
-  step. The usual causes: a fix exposes a design gap; a refactor needs a test edited, so it
+- A switch of mode mid-work is the agent's judgement (`CLAUDE.md`, Isolation and gates):
+  record what was found and why, and come back to this step for the new mode's steps. The usual causes: a fix exposes a design gap; a refactor needs a test edited, so it
   changes behavior; an extension turns out to need a new design.
 
 ## Step 2. Branch
@@ -77,7 +77,7 @@ Nothing is written before the branch exists.
 
 - Agree the code version with the user: an existing branch or a new one (`CLAUDE.md`,
   Isolation and gates).
-- A new branch is named `<prefix>/<short-name>` and lives in a worktree off `main` by
+- A new branch is named `<prefix>/<short-name>` and lives in its own worktree by
   default (`superpowers:using-git-worktrees`).
 - A branch says what it is responsible for, so that anyone who opens it can tell:
   - `feat/` and `refactor/`: the spec is its first commit (step 4).
@@ -265,7 +265,6 @@ version; and branch protection lets `main` change only by a squash-merged PR wit
 ## When to stop and come back to the user
 
 - At a gate: the mode, the interface sketch, a spike.
-- On a change of mode.
 - On a red-test verdict of feature gap or design gap.
 - On a bug in code we do not own.
 - On a collision with an ADR.

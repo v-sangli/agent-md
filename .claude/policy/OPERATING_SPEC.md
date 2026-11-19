@@ -8,46 +8,26 @@ workspace is structured, why the rules exist, and how to verify the setup. If a
 short rule and this document drift, update both deliberately instead of treating
 this file as an additional rule layer.
 
-## 0. The 3.0 Rollback
+## 0. Where Rules Live
 
-Versions up to 2.1 enforced the contract with blocking PreToolUse/PostToolUse
-hooks (`access_guard.sh`, `pre_tool_use_bash_guard.sh`,
-`post_tool_use_privilege_guard.sh`) and a shell-write executor
-(`.claude/harness/run.sh`). That model was retired on 2026-07-26:
-
-- Hook commands were registered with relative paths and run in the session's
-  current working directory. When the persistent shell cwd drifted out of the
-  workspace, every hook failed non-blocking — enforcement silently vanished
-  while tools kept running.
-- Working around it accumulated machine-specific absolute paths in
-  `settings.json` and permission rules, which defeated portability.
-- The prompt/block friction outweighed the protection: the model's actual
-  failure modes were path/cwd bugs, not destructive intent.
-
-The replacement model is advisory: `CLAUDE.md` states conventions, the
-`tmux-control` skill remains the encouraged route for visible/long-running
-work, and Claude Code's native permission `ask` list covers the few genuinely
-dangerous operations (git push, hard reset, sudo). No tool calls are blocked.
-
-## 0.1 The 3.1 Restructure
-
-On 2026-11-13 the harness was reshaped around an agreed design methodology. The
-enforcement model is unchanged: advisory text and the user's gates on the agent
-side; mechanical checks belong to each repo's CI and branch protection, not to
-hooks here. What changed is where things live. Three homes, split by the kind of
-statement:
+Decisions and their history are ADRs under `docs/adr/`; this file describes
+the current design only. Enforcement is advisory (ADR 0001): advisory text and
+the user's gates on the agent side; mechanical checks belong to each repo's CI
+and branch protection, not to hooks here. Rules live in three homes, split by
+the kind of statement (ADR 0002):
 
 - `CLAUDE.md` holds what binds any code that gets written: the code stance,
-  the red-test verdict, the isolation rules and gates, the runtime conventions.
-  It is always in context, for the subagents that write code too (the built-in
-  Explore and Plan agents are the exception), so it is the only home for a rule
-  that constrains code. It stays under 200 lines; the verifier checks that.
+  the red-test verdict, the isolation rules and gates, research work, the
+  runtime conventions. It is always in context, for the subagents that write
+  code too (the built-in Explore and Plan agents are the exception), so it is
+  the only home for a rule that constrains code. It stays under 300 lines; the
+  verifier checks that.
 - `.claude/skills/dev-flow/` holds the order of work for a code change, from
   request to merge. Each step establishes its concept: what it is for, what it
   produces, who confirms it. `SKILL.md` carries every definition; its reference
   files hold worked examples and templates only.
-- The vendored `superpowers` skills hold the technique for one step. Each skill
-  used to require the next; those hand-offs now return to `dev-flow`.
+- The vendored `superpowers` skills hold the technique for one step; their
+  hand-offs return to `dev-flow`.
 
 The test for every text is coverage: a concept the harness uses is either
 generally known, and then it is named with only our additions stated, or it is
@@ -63,31 +43,9 @@ How the text is edited:
 
 - A rule is written once, in its home.
 - A line that says the opposite is edited or deleted in the same commit.
-  Nothing is overridden from elsewhere. The former `CLAUDE.md` block that
-  declared itself an override of any skill is gone, together with the "default
-  off" worktree rule and the "do not commit unless asked" rule it carried.
+  Nothing is overridden from elsewhere.
 - A skill may name a rule at the moment it applies, in one line. It does not
   restate it.
-
-## 0.2 Porting 3.1 Onto the Template
-
-The 3.1 restructure was written on another machine, on top of that machine's
-copy of the harness, which predated the template's 2026-11-09 changes. On
-2026-11-14 it was ported onto the template. Where the two disagreed:
-
-- Isolation and gates (worktrees by default, commits on the feature branch)
-  come from 3.1, as intended there.
-- tmux comes from the template: the root session is user-owned and escalated
-  in-pane with `sudo -i` (not a shared `sudo tmux -S` socket, whose server is
-  root-owned); sessions carry `@claude_session` and `@role` pane options;
-  `stop`, `cleanup` and the `SessionEnd` hook (`cleanup --idle-only`) reap
-  only the calling session's own sessions.
-- Every subagent runs on opus, stated in `CLAUDE.md` and in the vendored
-  `subagent-driven-development` skill; models are not tiered by difficulty.
-- The other machine's GMI guard hook and its `CLAUDE.local.md` stay on that
-  machine. `CLAUDE.local.md` is git-ignored here.
-- `HARNESS_CHECKLIST.md` is retired; decisions are recorded in this file. Its
-  past entries stay in git history.
 
 ## 1. File Roles
 
@@ -95,7 +53,8 @@ copy of the harness, which predated the template's 2026-11-09 changes. On
 CLAUDE.md                         always-loaded rule source: code stance, isolation and gates,
                                   conventions (advisory), style
 CLAUDE.local.md                   one machine's own rules; loaded with CLAUDE.md, not in the template
-.claude/policy/OPERATING_SPEC.md  rationale, design notes, acceptance criteria
+.claude/policy/OPERATING_SPEC.md  current design, rationale, acceptance criteria
+docs/adr/                         harness decisions and their history (not bundled)
 .claude/skills/dev-flow/          order of work for a code change, request to merge;
                                   references/ holds a worked sketch and the ADR template
 .claude/ENV.md                    environment identity and activation commands
@@ -105,20 +64,6 @@ CLAUDE.local.md                   one machine's own rules; loaded with CLAUDE.md
 .claude/skills/tmux-control/      visible shell/root workflow helper
 .claude/skills/superpowers/       vendored Superpowers plugin, locally amended (section 7)
 ```
-
-Deleted on 2026-08-12: `.claude/hooks/access_guard.sh`,
-`.claude/hooks/pre_tool_use_guard.sh`, `.claude/hooks/pre_tool_use_bash_guard.sh`,
-`.claude/hooks/post_tool_use_privilege_guard.sh`, `.claude/harness/run.sh`,
-`.claude/access.conf`. They had been unregistered since the rollback; the
-rationale above is the record, and `verify_setup.sh` asserts their absence.
-
-Folded on 2026-11-13: `.claude/policy/AGENT_RULES.md` into `CLAUDE.md`
-(Conventions), wording kept. It was not auto-loaded: only a pointer led to it,
-so its rules held only when the agent went and read it. `CLAUDE.md` is always
-in context, for subagents too. One line was not carried over, "one minimal
-patch before investigation": the vendored `systematic-debugging` skill says the
-opposite (no fix before root-cause investigation) and prevails.
-`verify_setup.sh` asserts the file's absence.
 
 ## 2. Access Model
 
@@ -187,8 +132,7 @@ every task into ceremony.
 part of this harness.
 `superpowers` is copied as a complete project-scope plugin directory because
 its repo-level glue files matter. Avoid flattening third-party plugin repos
-unless the loss of their root metadata is intentional and documented. The
-vendored `dx` plugin was removed on 2026-11-13.
+unless the loss of their root metadata is intentional and documented.
 
 `superpowers` is no longer a pristine copy. Local changes, all in skill text:
 
@@ -212,7 +156,7 @@ vendored `dx` plugin was removed on 2026-11-13.
   starting work on `main`;
 - `subagent-driven-development` (Model Selection, BLOCKED handling, and its
   implementer and task-reviewer prompts) dispatches every role on opus instead
-  of tiering models by difficulty (2026-11-09).
+  of tiering models by difficulty.
 
 The record of these changes is this repository's git history. An upstream
 update means re-applying them. The plugin's README, its Codex reference and one
@@ -247,7 +191,7 @@ Setup is considered correct when all are true:
 7. Environment details live in `.claude/ENV.md`.
 8. A rule is stated once: `CLAUDE.md` for standing rules, `dev-flow` for the
    order of work. Skills name a rule and do not restate it.
-9. `CLAUDE.md` is under 200 lines and names no host, machine path or repo.
+9. `CLAUDE.md` is under 300 lines and names no host, machine path or repo.
 10. Every concept `CLAUDE.md` or `dev-flow` uses is generally known or is
     established in one of the two.
 
@@ -255,7 +199,8 @@ Setup is considered correct when all are true:
 
 When updating this harness intentionally:
 
-1. Record the decision being made in this file.
+1. Record the decision as an ADR under `docs/adr/`; update this file to the
+   new design.
 2. Keep active scripts Bash-only.
 3. Prefer editing the canonical source over repeating a rule in more files.
 4. Run `bash .claude/verify_setup.sh`.

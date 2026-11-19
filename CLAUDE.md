@@ -1,7 +1,8 @@
 # Claude Project Context
 
 This repository is a Claude Code workspace/harness under active design. Before changing its
-structure, read `.claude/policy/OPERATING_SPEC.md` and record the decision there.
+structure, read `.claude/policy/OPERATING_SPEC.md`; record the decision as an ADR under
+`docs/adr/` and keep the spec describing the current design.
 
 - `.claude/ENV.md`: environment contract.
 - `CLAUDE.local.md`, where present: this machine's own rules. Hosts, machine paths and repo
@@ -109,8 +110,8 @@ total context of the change and its diff.
 - Agree which code version the work is on before it starts: an existing branch or a new
   one. `main` is never the working version.
 - One feature per branch. Features are not stacked into the same branch.
-- Worktrees are the default for feature branches: the root checkout stays on `main`, the
-  work happens in a worktree off it and returns by PR.
+- Worktrees are the default for feature branches: each branch works in its own worktree,
+  isolated from the others, and returns by PR.
 - Commit freely on the branch, one commit per logical change. Never commit on `main`.
 - `main` changes only by a squash-merged PR with green CI. Never rebase-merge.
 - Spec, plan and spike files live only on the feature branch and are deleted before merge.
@@ -118,7 +119,9 @@ total context of the change and its diff.
 Four things need the user's word. The agent proposes, the user confirms.
 
 - **The mode**, which is also the branch prefix. It says where the change sits relative to
-  an existing design. Switching mode mid-work is explicit and goes back to the user.
+  an existing design. Work evolves: switching mode mid-work, or handing work between
+  `exp/` and another branch, is the agent's judgement. The agent records the switch and
+  its reason on the branch, and the new mode's gates apply.
   - `feat/`: new behavior. Where a design already exists, rule 3 picks the shape, and a
     frozen core is touched only by full integration.
   - `refactor/`: behavior stays the same. The oracle passes with no test edited; where
@@ -137,6 +140,16 @@ Four things need the user's word. The agent proposes, the user confirms.
 
 Any code change in a repo, an allowed `exp/` branch aside, goes through the `dev-flow`
 skill: the order of work from request to merge, what each step produces and who confirms it.
+
+## Research work
+
+- Experiment work lives on an `exp/` branch and is recorded with the project's provenance
+  tool (`prov`) and the skills it installs. Read the journal's `NOW.md` before starting.
+- The provenance records are the trace. Every run, dataset and finding is registered
+  there and persists whatever becomes of the branch. A finding cites the IDs it rests on.
+- When an experiment needs a feature, fix or refactor, that work goes on its own branch
+  through `dev-flow`, isolated from the experiment. It may branch from the `exp/` branch
+  and return to it by PR.
 
 ## Conventions
 

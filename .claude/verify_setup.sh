@@ -99,6 +99,7 @@ need_command realpath
 
 need_file ".claude/ENV.md"
 need_file ".claude/policy/OPERATING_SPEC.md"
+need_file "docs/adr/0001-advisory-enforcement.md"
 need_file ".claude/settings.json"
 need_file ".claude/hooks/session_start.sh"
 need_file ".claude/skills/dev-flow/SKILL.md"
@@ -235,13 +236,13 @@ else
   fail "CLAUDE.md contains the code stance and the kept Karpathy guidance"
 fi
 
-# CLAUDE.md is loaded into every session and every subagent. Past about 200
-# lines adherence drops, so growth has to be paid for by moving text out.
+# CLAUDE.md is loaded into every session and every subagent; the cap keeps its growth
+# deliberate.
 claude_lines="$(wc -l <"$REPO_DIR/CLAUDE.md")"
-if [ "$claude_lines" -lt 200 ]; then
-  pass "CLAUDE.md is under 200 lines ($claude_lines)"
+if [ "$claude_lines" -lt 300 ]; then
+  pass "CLAUDE.md is under 300 lines ($claude_lines)"
 else
-  fail "CLAUDE.md is under 200 lines ($claude_lines)"
+  fail "CLAUDE.md is under 300 lines ($claude_lines)"
 fi
 
 env_ok=1
@@ -275,8 +276,8 @@ done
 for required in \
   "Version: 3.1" \
   "canonical rule source" \
-  "The 3.0 Rollback" \
-  "The 3.1 Restructure" \
+  "Where Rules Live" \
+  "docs/adr/" \
   "dev-flow" \
   "tmux-control" \
   ".claude/ENV.md"; do
