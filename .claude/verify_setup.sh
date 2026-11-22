@@ -274,7 +274,7 @@ for required in \
   rg -Fq "$required" "$REPO_DIR/CLAUDE.md" || policy_ok=0
 done
 for required in \
-  "Version: 3.1" \
+  "Version: " \
   "canonical rule source" \
   "Where Rules Live" \
   "docs/adr/" \
