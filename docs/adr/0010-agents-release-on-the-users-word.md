@@ -1,8 +1,8 @@
 # 0010. Agents release on the user's word; a tag is created at release only
 
-Status: Proposed (2026-11-22)
+Status: Accepted (2026-11-22)
 Covers: `.claude/skills/shipping-and-launch/`, `CLAUDE.md` (Isolation and gates), `.claude/skills/dev-flow/SKILL.md` (Step 9, CI checks), `.claude/policy/OPERATING_SPEC.md` (§1, §7)
-PR: pending
+PR: pending; commits `2d26ff3` (spec), `3228b91` (sketch), `8b67bac` (plan, `docs/superpowers/plans/2026-11-22-ship-skill.md`), `c065cc6`, `8bc27c7`, `836c324`
 
 ## Context
 
@@ -34,6 +34,8 @@ permission, with one hard requirement: never rebase.
 
 ## Consequences
 
+- `dev-flow`'s CI section no longer lists a tagging job among the repo's setup: branch
+  protection is the one setup item left.
 - Easier: a release is one confirmed proposal, and its record is the tag, the Release notes
   and the label history.
 - Harder: merged but unreleased versions have no tag; downstream pins them by commit SHA.
