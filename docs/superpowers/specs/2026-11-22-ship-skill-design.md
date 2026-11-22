@@ -124,3 +124,60 @@ code, which is `dev-flow`'s.
 - `scripts/pr_gate.py` passes: ADR number unique, version raised, branch-only files gone.
 - No live release runs on this branch. The first real release after merge (the harness at
   v3.4 is a natural candidate) is the skill's first end-to-end use.
+
+## Agreed interface sketch
+
+Layout: `.claude/skills/shipping-and-launch/SKILL.md` only; no `references/`.
+
+Section outline (kept from upstream / amended / new):
+
+```
+---
+name: shipping-and-launch
+description: Use when releasing a version of a repo or of a prov artifact - tagging,
+  a GitHub Release, moving a release label - or rolling a release back. Runs after merge.
+---
+# Shipping and Launch
+## Overview                         amended  reversible, observable, confirmed
+## When to Use                      amended  + "not for: writing the code (dev-flow)"
+## Release targets                  new      table: target | what ships | ship | rollback
+## Pre-release checks               amended  ### Code  ### prov artifact
+## The release gate                 new      the proposal (below); then end the turn
+## Shipping                         amended  ### Code  ### prov artifact (commands)
+## Post-release verification        amended  ### Code  ### prov artifact
+## Feature flags                    amended  a flag is a DEVIATIONS.md row; lifecycle
+## Rollback                         amended  triggers, who decides, plan template
+## Common Rationalizations          kept + ours
+## Red Flags                        kept + ours
+## Verification                     amended  before / after checklists
+## See Also                         amended  dev-flow, CLAUDE.md
+```
+
+The release proposal, the data that crosses the gate; the agent shows it, then ends its turn:
+
+```markdown
+## Release proposal: <target name> <version>
+
+Target:    code | prov artifact
+Ships:     tag `<tag>` on `<sha>` + GitHub Release (latest)           # code
+           `<kind>:<name>@release` -> `<kind>:<name>/<N>` (was /<M>)  # prov
+Checks:    one line per pre-release check: pass, with its evidence
+Notes:     the draft release notes (code) or the alias change and its trace summary (prov)
+Depends:   prov alias versions the code needs, or `-`
+Rollback:  triggers, steps, who acts (agent at once on an agreed trigger; otherwise ask)
+```
+
+Commands per target:
+
+| | Ship | Post-release check | Rollback |
+|---|---|---|---|
+| Code | `git tag -a <tag> <sha> -m ...`, `git push origin <tag>`, `gh release create <tag> --verify-tag --latest --notes-file ...` | fresh venv: `uv pip install "git+<url>@<tag>[#subdirectory=...]"`, import, `--help` | `gh release edit <tag> --title "[withdrawn] ..." --latest=false`; revert or fix PR; new release |
+| prov artifact | `prov alias label <kind>:<name>@release <kind>:<name>/<N>`; push the registry | `prov show <kind>:<name>@release`; remote has the commit | `prov alias label ... /<M>`; push |
+
+Only tags and the registry are pushed. `main` changes only by PR; nothing is rebased or
+force-pushed.
+
+Worked example, target axis: adding a package index touches one Release targets row, one
+`###` subsection each under pre-release checks, Shipping, Post-release verification and
+Rollback, and a new ADR. Not the gate, the proposal form, Feature flags, the
+rationalizations, or the `CLAUDE.md` and `dev-flow` wiring.
