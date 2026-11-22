@@ -236,8 +236,8 @@ Turns the branch into one reviewable change. In this order:
 
 A `fix/` runs items 1, 2, 4 and 7.
 
-Merging does not make a release. A confirmed stable release is published on purpose by the
-user, after due diligence outside CI: CI passing and production validation are different
+Merging does not make a release. A release is the fifth gate (`CLAUDE.md`, Isolation and
+gates), run by `shipping-and-launch`: CI passing and a verified release are different
 claims.
 
 ## The CI checks the rules lean on
@@ -255,8 +255,9 @@ not in this harness.
 | ADR numbers unique | Two ADRs carry the same number. |
 | Deviations match | A `DEVIATION(<id>)` comment has no row in `DEVIATIONS.md`, or a row has no comment. |
 
-Two more belong to the repo's setup: on merge to `main`, CI creates the git tag from the
-version; and branch protection lets `main` change only by a squash-merged PR with green CI.
+One more belongs to the repo's setup: branch protection lets `main` change only by a
+squash-merged PR with green CI. No CI job creates tags: a tag is created only at release
+(`shipping-and-launch`).
 
 - Greenfield: setting these up is part of the first plan.
 - An existing repo that lacks one: say so at step 1 and add nothing on your own. Until the
@@ -264,7 +265,7 @@ version; and branch protection lets `main` change only by a squash-merged PR wit
 
 ## When to stop and come back to the user
 
-- At a gate: the mode, the interface sketch, a spike.
+- At a gate: the mode, the interface sketch, a spike, a release.
 - On a red-test verdict of feature gap or design gap.
 - On a bug in code we do not own.
 - On a collision with an ADR.

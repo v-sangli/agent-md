@@ -271,9 +271,13 @@ for required in \
   "not a gate" \
   "tmux-control" \
   ".claude/ENV.md" \
-  "PYTHONPATH=."; do
+  "PYTHONPATH=." \
+  "Five things need the user's word" \
+  "**A release.**"; do
   rg -Fq "$required" "$REPO_DIR/CLAUDE.md" || policy_ok=0
 done
+rg -Fq "CI creates the git tag" "$REPO_DIR/.claude/skills/dev-flow/SKILL.md" && policy_ok=0
+rg -Fq "shipping-and-launch" "$REPO_DIR/.claude/skills/dev-flow/SKILL.md" || policy_ok=0
 for required in \
   "Version: " \
   "canonical rule source" \
