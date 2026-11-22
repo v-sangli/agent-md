@@ -1,0 +1,16 @@
+name: verify
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install verifier dependencies
+        run: sudo apt-get update && sudo apt-get install -y ripgrep tmux jq
+      - name: Run the harness verifier
+        run: bash .claude/verify_setup.sh

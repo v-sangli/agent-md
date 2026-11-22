@@ -55,6 +55,7 @@ CLAUDE.md                         always-loaded rule source: code stance, isolat
 CLAUDE.local.md                   one machine's own rules; loaded with CLAUDE.md, not in the template
 .claude/policy/OPERATING_SPEC.md  current design, rationale, acceptance criteria
 docs/adr/                         harness decisions and their history (not bundled)
+.github/workflows/verify.yml      CI: runs verify_setup.sh on every PR and push to main
 .claude/skills/dev-flow/          order of work for a code change, request to merge;
                                   references/ holds a worked sketch and the ADR template
 .claude/ENV.md                    environment identity and activation commands
