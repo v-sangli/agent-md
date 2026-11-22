@@ -1,6 +1,6 @@
 # Claude Operating Specification
 
-Version: 3.2
+Version: 3.3
 Scope: Current advisory Claude Code workspace/harness in this repository.
 
 `CLAUDE.md` is the canonical rule source. This file explains how the
@@ -187,7 +187,7 @@ Setup is considered correct when all are true:
    advisory — no blocking hooks are registered.
 4. `OPERATING_SPEC.md` explains design/rationale without becoming a second
    stronger rule layer.
-5. `settings.json` registers only the SessionStart hook, allows tools broadly,
+5. `settings.json` registers only the SessionStart and SessionEnd hooks, allows tools broadly,
    and contains no machine-specific absolute paths.
 6. `git push`, `git reset --hard`, and `sudo` remain on the permissions `ask`
    list.
