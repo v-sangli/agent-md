@@ -11,7 +11,7 @@ Use tmux whenever opaque one-shot shell execution would hide progress, prompts, 
 
 - Run benchmark, test, install, build, clone, migration, server, watcher, debugger, and nested-agent commands in tmux.
 - Keep direct shell only for quick read-only inspection such as `pwd`, `ls`, `rg`, `sed`, `cat`, `find`, `head`, `tail`, `wc`, `stat`, `file`, and `git status`.
-- For sudo/root work, the root tmux session below is always the first option. Follow `.claude/policy/AGENT_RULES.md` and [references/sudo.md](references/sudo.md).
+- For sudo/root behavior, follow the Privilege convention in `CLAUDE.md` and [references/sudo.md](references/sudo.md).
 - Report the attach command, pane roles, and any durable capture location.
 - Stop every session you started once its work is done (`stop --session NAME`, or `cleanup` for all of yours). Use `start --keep` only for a service the user wants left running, and say so. Never stop sessions you did not start.
 

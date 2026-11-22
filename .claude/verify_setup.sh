@@ -98,21 +98,18 @@ need_command rg
 need_command realpath
 
 need_file ".claude/ENV.md"
-need_file ".claude/policy/AGENT_RULES.md"
 need_file ".claude/policy/OPERATING_SPEC.md"
+need_file "docs/adr/0001-advisory-enforcement.md"
 need_file ".claude/settings.json"
 need_file ".claude/hooks/session_start.sh"
-need_file ".claude/hooks/session_end.sh"
+need_file ".claude/skills/dev-flow/SKILL.md"
+need_file ".claude/skills/dev-flow/references/interface-sketch.md"
+need_file ".claude/skills/dev-flow/references/adr-template.md"
 need_file ".claude/skills/tmux-control/SKILL.md"
 need_file ".claude/skills/tmux-control/references/commands.md"
 need_file ".claude/skills/tmux-control/references/sudo.md"
 need_file ".claude/skills/tmux-control/references/validation.md"
 need_file ".claude/skills/tmux-control/scripts/tmux_control.sh"
-need_file ".claude/skills/dx/.claude-plugin/plugin.json"
-need_file ".claude/skills/dx/CLAUDE.md"
-need_file ".claude/skills/dx/GLOBAL-CLAUDE.md"
-need_file ".claude/skills/dx/skills/handoff/SKILL.md"
-need_file ".claude/skills/dx/skills/clone/SKILL.md"
 need_file ".claude/skills/superpowers/.claude-plugin/plugin.json"
 need_file ".claude/skills/superpowers/CLAUDE.md"
 need_file ".claude/skills/superpowers/AGENTS.md"
@@ -140,6 +137,11 @@ need_absent ".claude/hooks/pre_tool_use_guard.sh"
 need_absent ".claude/hooks/pre_tool_use_bash_guard.sh"
 need_absent ".claude/hooks/post_tool_use_privilege_guard.sh"
 
+# Folded into CLAUDE.md (Conventions) on 2026-11-13. It was never auto-loaded,
+# so its rules held only when the agent went and read it. Absence is asserted
+# so a second rule source cannot creep back in.
+need_absent ".claude/policy/AGENT_RULES.md"
+
 need_exec ".claude/hooks/session_start.sh"
 need_exec ".claude/hooks/session_end.sh"
 need_exec ".claude/skills/tmux-control/scripts/tmux_control.sh"
@@ -147,9 +149,11 @@ need_exec ".claude/skills/tmux-control/scripts/tmux_control.sh"
 # Portability: this harness is a general template. Only .claude/ENV.md may name
 # one machine's paths or environments — everything else must resolve through
 # $CLAUDE_PROJECT_DIR or a relative path. Vendored plugins are upstream content
-# and settings.local.json is machine-local, so both are out of scope.
-env_leaks="$(rg -l --no-messages '/home/[a-zA-Z]|/Users/[a-zA-Z]' "$REPO_DIR/.claude" \
-  -g '!**/skills/dx/**' -g '!**/skills/superpowers/**' \
+# and settings.local.json is machine-local, so both are out of scope. CLAUDE.md
+# is part of the template and is scanned too; one machine's rules live in
+# CLAUDE.local.md, which is not.
+env_leaks="$(rg -l --no-messages '/home/[a-zA-Z]|/Users/[a-zA-Z]' "$REPO_DIR/.claude" "$REPO_DIR/CLAUDE.md" \
+  -g '!**/skills/superpowers/**' \
   -g '!**/ENV.md' -g '!**/settings.local.json' || true)"
 if [ -z "$env_leaks" ]; then
   pass "harness is machine-portable: absolute home paths confined to ENV.md"
@@ -207,9 +211,9 @@ done
 shopt -u nullglob
 
 if printf '%s' "$standalone_names" | rg -qx 'tmux-control' &&
-  [ "$plugin_skill_count" -ge 22 ] &&
+  printf '%s' "$standalone_names" | rg -qx 'dev-flow' &&
+  [ "$plugin_skill_count" -ge 13 ] &&
   printf '%s' "$plugin_skill_names" | rg -qx 'superpowers:using-superpowers' &&
-  printf '%s' "$plugin_skill_names" | rg -qx 'dx:handoff' &&
   [ "$skill_bad" -eq 0 ]; then
   pass "standalone skills and project-scope plugins have Claude-compatible metadata"
 else
@@ -218,17 +222,27 @@ fi
 
 claude_ok=1
 for required in \
+  "## Code stance" \
+  "### When a test is red" \
+  "## Isolation and gates" \
   "## Karpathy guidelines" \
-  "### 1. Think before coding" \
-  "### 2. Simplicity first" \
-  "### 3. Surgical changes" \
-  "### 4. Goal-driven execution"; do
+  "**Think before coding.**" \
+  "**Scope of a change.**"; do
   rg -Fq "$required" "$REPO_DIR/CLAUDE.md" || claude_ok=0
 done
 if [ "$claude_ok" -eq 1 ]; then
-  pass "CLAUDE.md contains distilled Karpathy guidance"
+  pass "CLAUDE.md contains the code stance and the kept Karpathy guidance"
 else
-  fail "CLAUDE.md contains distilled Karpathy guidance"
+  fail "CLAUDE.md contains the code stance and the kept Karpathy guidance"
+fi
+
+# CLAUDE.md is loaded into every session and every subagent; the cap keeps its growth
+# deliberate.
+claude_lines="$(wc -l <"$REPO_DIR/CLAUDE.md")"
+if [ "$claude_lines" -lt 300 ]; then
+  pass "CLAUDE.md is under 300 lines ($claude_lines)"
+else
+  fail "CLAUDE.md is under 300 lines ($claude_lines)"
 fi
 
 env_ok=1
@@ -236,11 +250,10 @@ for required in \
   "bin/activate" \
   "python -V" \
   "which python" \
-  ".claude/policy/AGENT_RULES.md"; do
+  "CLAUDE.md"; do
   rg -Fq "$required" "$REPO_DIR/.claude/ENV.md" || env_ok=0
 done
 for required in \
-  "AGENT_RULES.md" \
   "OPERATING_SPEC.md" \
   ".claude/ENV.md"; do
   rg -Fq "$required" "$REPO_DIR/CLAUDE.md" || env_ok=0
@@ -258,19 +271,21 @@ for required in \
   "tmux-control" \
   ".claude/ENV.md" \
   "PYTHONPATH=."; do
-  rg -Fq "$required" "$REPO_DIR/.claude/policy/AGENT_RULES.md" || policy_ok=0
+  rg -Fq "$required" "$REPO_DIR/CLAUDE.md" || policy_ok=0
 done
 for required in \
-  "Version: 3.0" \
+  "Version: 3.1" \
   "canonical rule source" \
-  "The 3.0 Rollback" \
+  "Where Rules Live" \
+  "docs/adr/" \
+  "dev-flow" \
   "tmux-control" \
   ".claude/ENV.md"; do
   rg -Fq "$required" "$REPO_DIR/.claude/policy/OPERATING_SPEC.md" || policy_ok=0
 done
-if rg -Fq ".claude-log" "$REPO_DIR/.claude/policy/AGENT_RULES.md" "$REPO_DIR/.claude/policy/OPERATING_SPEC.md" ||
-  rg -Fq ".claude-tools" "$REPO_DIR/.claude/policy/AGENT_RULES.md" "$REPO_DIR/.claude/policy/OPERATING_SPEC.md" ||
-  rg -Fq "spec_hashes.json" "$REPO_DIR/.claude/policy/AGENT_RULES.md" "$REPO_DIR/.claude/policy/OPERATING_SPEC.md"; then
+if rg -Fq ".claude-log" "$REPO_DIR/CLAUDE.md" "$REPO_DIR/.claude/policy/OPERATING_SPEC.md" ||
+  rg -Fq ".claude-tools" "$REPO_DIR/CLAUDE.md" "$REPO_DIR/.claude/policy/OPERATING_SPEC.md" ||
+  rg -Fq "spec_hashes.json" "$REPO_DIR/CLAUDE.md" "$REPO_DIR/.claude/policy/OPERATING_SPEC.md"; then
   policy_ok=0
 fi
 if [ "$policy_ok" -eq 1 ]; then
@@ -280,7 +295,7 @@ else
 fi
 
 ss_out="$(printf '{"session_id":"verify"}' | CLAUDE_PROJECT_DIR="$REPO_DIR" bash "$REPO_DIR/.claude/hooks/session_start.sh")"
-for key in "STATE REINJECTION" "SESSION_ID:" "RULE SOURCES:" "POINTERS:"; do
+for key in "STATE REINJECTION" "SESSION_ID:" "RULE SOURCES:" "POINTERS:" '`sudo -i`' '`sudo tmux`'; do
   if printf '%s\n' "$ss_out" | rg -q "$key"; then
     pass "session_start output contains $key"
   else

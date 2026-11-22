@@ -199,7 +199,7 @@ The Pi package loads the Superpowers skills and a small extension that injects t
 
 6. **requesting-code-review** - Activates between tasks. Reviews against plan, reports issues by severity. Critical issues block progress.
 
-7. **finishing-a-development-branch** - Activates when tasks complete. Verifies tests, presents options (merge/PR/keep/discard), cleans up worktree.
+7. **dev-flow, Finalize step** (workspace skill, not part of this plugin) - Runs when tasks complete. This vendored copy has no `finishing-a-development-branch` skill.
 
 **The agent checks for relevant skills before any task.** Mandatory workflows, not suggestions.
 
@@ -211,7 +211,7 @@ The Pi package loads the Superpowers skills and a small extension that injects t
 - **test-driven-development** - RED-GREEN-REFACTOR cycle (includes testing anti-patterns reference)
 
 **Debugging**
-- **systematic-debugging** - 4-phase root cause process (includes root-cause-tracing, defense-in-depth, condition-based-waiting techniques)
+- **systematic-debugging** - 4-phase root cause process (includes root-cause-tracing, condition-based-waiting techniques)
 - **verification-before-completion** - Ensure it's actually fixed
 
 **Collaboration** 
@@ -222,7 +222,6 @@ The Pi package loads the Superpowers skills and a small extension that injects t
 - **requesting-code-review** - Pre-review checklist
 - **receiving-code-review** - Responding to feedback
 - **using-git-worktrees** - Parallel development branches
-- **finishing-a-development-branch** - Merge/PR decision workflow
 - **subagent-driven-development** - Fast iteration with two-stage review (spec compliance, then code quality)
 
 **Meta**
