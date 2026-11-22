@@ -116,7 +116,7 @@ total context of the change and its diff.
 - `main` changes only by a squash-merged PR with green CI. Never rebase-merge.
 - Spec, plan and spike files live only on the feature branch and are deleted before merge.
 
-Four things need the user's word. The agent proposes, the user confirms.
+Five things need the user's word. The agent proposes, the user confirms.
 
 - **The mode**, which is also the branch prefix. It says where the change sits relative to
   an existing design. Work evolves: switching mode mid-work, or handing work between
@@ -137,6 +137,10 @@ Four things need the user's word. The agent proposes, the user confirms.
   are allowed there, except `hasattr` and `getattr(obj, name, default)`. A monkey patch in
   a spike is allowed but logged, each one as a missing extension point.
 - **An `exp/` branch**, the default home for experiment work. It must be allowed explicitly.
+- **A release.** A tag, a GitHub Release, or a prov release label moved. The agent
+  proposes it with its checks and its rollback plan, ends its turn, and ships it only on
+  the user's word (`shipping-and-launch`). A release pushes tags and the prov registry,
+  never `main`.
 
 Any code change in a repo, an allowed `exp/` branch aside, goes through the `dev-flow`
 skill: the order of work from request to merge, what each step produces and who confirms it.

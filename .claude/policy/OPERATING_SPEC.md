@@ -65,6 +65,8 @@ DEVIATIONS.md                     the deviation registry (code stance rule 6)
 .claude/hooks/session_start.sh    state reinjection at session start
 .claude/hooks/session_end.sh      safety-net cleanup of this session's idle tmux sessions
 .claude/skills/tmux-control/      visible shell/root workflow helper
+.claude/skills/shipping-and-launch/ releases: the fifth gate, after merge; copied and
+                                  amended (section 7)
 .claude/skills/superpowers/       vendored Superpowers plugin, locally amended (section 7)
 ```
 
@@ -136,6 +138,23 @@ part of this harness.
 `superpowers` is copied as a complete project-scope plugin directory because
 its repo-level glue files matter. Avoid flattening third-party plugin repos
 unless the loss of their root metadata is intentional and documented.
+
+`shipping-and-launch` is copied from `addyosmani/agent-skills`
+(`skills/shipping-and-launch/SKILL.md`, commit `8c99fa3`) as a standalone skill; the rest of
+that repo is not taken. Local changes, all in skill text (ADR 0010):
+
+- its description and When to Use fire on releasing, after merge, not on writing code;
+- the web-service checklists become checks for code (tag, CI, version, notes) and for prov
+  artifacts (alias version, lineage, bytes, registry);
+- staged rollout becomes the release gate: proposal, end of turn, the user's word;
+- shipping is an annotated tag plus a GitHub Release, or a prov `@release` label move;
+- feature flags are registered deviations; the error-reporting code, monitoring, error
+  budget and rollout thresholds are removed;
+- rollback never deletes or moves a tag and reaches `main` by a revert or fix PR;
+- the `../../references/` links go; the red flags add rebasing, force-pushing, moving a tag
+  and releasing without the gate.
+
+An upstream update means re-applying these.
 
 `superpowers` is no longer a pristine copy. Local changes, all in skill text:
 
