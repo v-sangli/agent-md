@@ -183,7 +183,7 @@ cmd_wait() {
     fi
     if [ -z "$matched" ] && [ -n "$target" ]; then
       pane="$(resolve_target "$target")"
-      matched="$(tmux capture-pane -p -t "$pane" -S -200 | grep -E -m1 "$pattern" || true)"
+      matched="$(tmux capture-pane -p -J -t "$pane" -S -200 | grep -E -m1 "$pattern" || true)"
     fi
     if [ -n "$matched" ]; then
       printf 'wait: matched: %s\n' "$matched"
