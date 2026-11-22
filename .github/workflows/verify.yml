@@ -14,3 +14,17 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ripgrep tmux jq
       - name: Run the harness verifier
         run: bash .claude/verify_setup.sh
+
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Merge checks (ADR numbers, deviations; on PRs also branch-only files and version)
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            python3 scripts/pr_gate.py --base "origin/${{ github.base_ref }}"
+          else
+            python3 scripts/pr_gate.py
+          fi

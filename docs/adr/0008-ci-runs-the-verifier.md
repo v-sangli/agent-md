@@ -1,6 +1,6 @@
 # 0008. CI runs the harness verifier on every PR
 
-Status: Accepted (2026-11-21)
+Status: Accepted (2026-11-21); "not yet covered" checks covered by 0009
 Covers: `.github/workflows/verify.yml`, `.claude/verify_setup.sh`
 PR: https://github.com/v-sangli/agent-md/pull/1
 

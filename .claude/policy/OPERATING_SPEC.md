@@ -1,6 +1,6 @@
 # Claude Operating Specification
 
-Version: 3.1
+Version: 3.2
 Scope: Current advisory Claude Code workspace/harness in this repository.
 
 `CLAUDE.md` is the canonical rule source. This file explains how the
@@ -55,7 +55,9 @@ CLAUDE.md                         always-loaded rule source: code stance, isolat
 CLAUDE.local.md                   one machine's own rules; loaded with CLAUDE.md, not in the template
 .claude/policy/OPERATING_SPEC.md  current design, rationale, acceptance criteria
 docs/adr/                         harness decisions and their history (not bundled)
-.github/workflows/verify.yml      CI: runs verify_setup.sh on every PR and push to main
+.github/workflows/verify.yml      CI: verify_setup.sh, and the merge gate (scripts/pr_gate.py)
+scripts/pr_gate.py                merge checks: ADR numbers, deviations, branch-only files, version
+DEVIATIONS.md                     the deviation registry (code stance rule 6)
 .claude/skills/dev-flow/          order of work for a code change, request to merge;
                                   references/ holds a worked sketch and the ADR template
 .claude/ENV.md                    environment identity and activation commands
