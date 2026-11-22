@@ -2,7 +2,7 @@
 
 Status: Accepted (2026-11-22)
 Covers: `.claude/skills/shipping-and-launch/`, `CLAUDE.md` (Isolation and gates), `.claude/skills/dev-flow/SKILL.md` (Step 9, CI checks), `.claude/policy/OPERATING_SPEC.md` (§1, §7)
-PR: pending; commits `2d26ff3` (spec), `3228b91` (sketch), `8b67bac` (plan, `docs/superpowers/plans/2026-11-22-ship-skill.md`), `c065cc6`, `8bc27c7`, `836c324`
+PR: https://github.com/v-sangli/agent-md/pull/4; commits `2d26ff3` (spec), `3228b91` (sketch), `8b67bac` (plan, `docs/superpowers/plans/2026-11-22-ship-skill.md`), `c065cc6`, `8bc27c7`, `836c324`
 
 ## Context
 
