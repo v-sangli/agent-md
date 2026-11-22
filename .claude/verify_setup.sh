@@ -295,7 +295,7 @@ else
 fi
 
 ss_out="$(printf '{"session_id":"verify"}' | CLAUDE_PROJECT_DIR="$REPO_DIR" bash "$REPO_DIR/.claude/hooks/session_start.sh")"
-for key in "STATE REINJECTION" "SESSION_ID:" "RULE SOURCES:" "POINTERS:"; do
+for key in "STATE REINJECTION" "SESSION_ID:" "RULE SOURCES:" "POINTERS:" '`sudo -i`' '`sudo tmux`'; do
   if printf '%s\n' "$ss_out" | rg -q "$key"; then
     pass "session_start output contains $key"
   else
