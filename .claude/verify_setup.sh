@@ -115,6 +115,7 @@ need_file ".claude/skills/superpowers/CLAUDE.md"
 need_file ".claude/skills/superpowers/AGENTS.md"
 need_file ".claude/skills/superpowers/skills/using-superpowers/SKILL.md"
 need_file ".claude/skills/superpowers/skills/brainstorming/SKILL.md"
+need_file ".claude/skills/shipping-and-launch/SKILL.md"
 
 need_absent ".claude-log"
 need_absent ".claude-tools"
@@ -270,9 +271,13 @@ for required in \
   "not a gate" \
   "tmux-control" \
   ".claude/ENV.md" \
-  "PYTHONPATH=."; do
+  "PYTHONPATH=." \
+  "Five things need the user's word" \
+  "**A release.**"; do
   rg -Fq "$required" "$REPO_DIR/CLAUDE.md" || policy_ok=0
 done
+rg -Fq "CI creates the git tag" "$REPO_DIR/.claude/skills/dev-flow/SKILL.md" && policy_ok=0
+rg -Fq "shipping-and-launch" "$REPO_DIR/.claude/skills/dev-flow/SKILL.md" || policy_ok=0
 for required in \
   "Version: " \
   "canonical rule source" \
@@ -292,6 +297,23 @@ if [ "$policy_ok" -eq 1 ]; then
   pass "policy docs are restored for the lean harness"
 else
   fail "policy docs are restored for the lean harness"
+fi
+
+ship_ok=1
+ship_md="$REPO_DIR/.claude/skills/shipping-and-launch/SKILL.md"
+if [ -f "$ship_md" ]; then
+  for required in "## The release gate" "## Release targets" "@release" "8c99fa3"; do
+    rg -Fq "$required" "$ship_md" || ship_ok=0
+  done
+  rg -q 'git revert .*&& *git push' "$ship_md" && ship_ok=0
+  rg -q 'git push[^`]*(--force|-f |main)' "$ship_md" && ship_ok=0
+else
+  ship_ok=0
+fi
+if [ "$ship_ok" -eq 1 ]; then
+  pass "shipping-and-launch: release gate, targets, no push to main or force-push"
+else
+  fail "shipping-and-launch: release gate, targets, no push to main or force-push"
 fi
 
 ss_out="$(printf '{"session_id":"verify"}' | CLAUDE_PROJECT_DIR="$REPO_DIR" bash "$REPO_DIR/.claude/hooks/session_start.sh")"

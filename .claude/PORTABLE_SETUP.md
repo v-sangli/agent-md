@@ -69,6 +69,7 @@ This checks:
 - standalone project skills and vendored project-scope plugins are installed under `.claude/skills/`
 - `tmux-control` is installed in `.claude/skills/tmux-control/`
 - `dev-flow` is installed in `.claude/skills/dev-flow/`, with its two reference files
+- `shipping-and-launch` is installed in `.claude/skills/shipping-and-launch/`
 - Superpowers is installed as `.claude/skills/superpowers/`, preserving its plugin namespace and repo glue files.
 - settings.json is advisory: `SessionStart`/`SessionEnd` only, no blocking hooks, no machine-specific absolute paths
 - session bootstrap works
