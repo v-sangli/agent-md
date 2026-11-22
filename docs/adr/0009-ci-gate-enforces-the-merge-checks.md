@@ -2,7 +2,7 @@
 
 Status: Accepted (2026-11-22)
 Covers: `scripts/pr_gate.py`, `.github/workflows/verify.yml`, `DEVIATIONS.md`, `.claude/policy/OPERATING_SPEC.md` (`Version:`)
-PR: pending
+PR: https://github.com/v-sangli/agent-md/pull/2
 
 ## Context
 
