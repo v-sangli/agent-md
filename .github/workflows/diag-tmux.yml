@@ -15,7 +15,11 @@ jobs:
           check() {
             bash -lc "$tc_env '$tc' start --session verify-wrap >/dev/null && $tc_env '$tc' send --target verify-wrap::run --command 'printf %0120d%s\\\\n 0 WRAPEND' >/dev/null && $tc_env '$tc' wait --target verify-wrap::run --pattern '0{100}WRAPEND' --timeout 5 --interval 1 >/dev/null"
             echo "rc=$?"
-            echo "--- pane -J"; tmux capture-pane -p -J -t verify-wrap:control.0 -S -200 | cat -A | grep -v '^\$$' | tail -10
+            tmux -V
+            for f in "" "-J" "-J -N" "-N"; do
+              echo "--- pane [$f]"; tmux capture-pane -p $f -t verify-wrap:control.0 -S -200 | cat -A | grep -v '^\$$' | tail -6
+            done
+            echo "--- printf to file"; printf %0120d%s\\n 0 WRAPEND | wc -c
             tmux list-panes -t verify-wrap -F '#{pane_id} #{pane_width}x#{pane_height} role=#{@role}'
             env $tc_env "$tc" stop --session verify-wrap >/dev/null
           }
