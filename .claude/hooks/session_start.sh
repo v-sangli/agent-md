@@ -28,3 +28,32 @@ POINTERS:
   tmux_control.sh stop --session NAME (or cleanup for all of yours).
 - Use bash .claude/verify_setup.sh after harness changes.
 EOF
+
+# prov status (ADR 0011): installed once per machine by .claude-workflow/install_prov.sh,
+# which writes the pointer file read here.
+pointer="${PROV_POINTER:-$HOME/.config/prov/install.toml}"
+echo
+if [ -f "$pointer" ]; then
+  declare -A prov
+  while IFS=' =' read -r key value; do
+    case "$key" in ''|'#'*) continue ;; esac
+    value="${value#*\"}"; prov[$key]="${value%\"}"
+  done <"$pointer"
+  echo "PROV: ${prov[ref]} (${prov[commit]:0:7}) at ${prov[home]}"
+  echo "- CLIs prov, prov-journal in ${prov[bin]}; skills: ${prov[skills]}."
+  echo "- Usage: ${prov[usage]}. A run's own env installs prov from ${prov[home]}/packages/prov."
+else
+  echo "PROV: not installed on this machine (no $pointer)."
+  echo "- To install, propose to the user: bash .claude-workflow/install_prov.sh <release tag>"
+fi
+dir="$ROOT_DIR"
+while [ ! -f "$dir/prov.toml" ] && [ "$dir" != "/" ]; do
+  dir="${dir%/*}"; [ -n "$dir" ] || dir="/"
+done
+if [ -f "$dir/prov.toml" ]; then
+  echo "- This workspace is a prov project (prov.toml at $dir): resolve any ID or alias with"
+  echo "  prov show / trace / uses before assuming anything about it; cite IDs, never paths."
+  if [ -f "$dir/journal/NOW.md" ]; then
+    echo "- Read $dir/journal/NOW.md before starting work."
+  fi
+fi

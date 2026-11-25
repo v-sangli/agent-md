@@ -332,6 +332,11 @@ else
   pass "session_start output avoids removed scaffolding"
 fi
 
+# prov status at session start (ADR 0011): from the pointer file install_prov.sh writes.
+printf 'home = "/opt/prov"\nref = "prov-v9.9.9"\ncommit = "abcdef0123456789"\nbin = "/opt/bin"\nskills = "prov prov-journal prov-plot"\nusage = "/opt/prov/docs/usage.md"\n' >/tmp/verify_prov_pointer.toml
+run_expect "session_start reports the installed prov from its pointer file" 0 bash -c "printf '{}' | PROV_POINTER=/tmp/verify_prov_pointer.toml CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/session_start.sh' | rg -q '^PROV: prov-v9.9.9 \(abcdef0\) at /opt/prov$'"
+run_expect "session_start says how to install prov when there is no pointer file" 0 bash -c "printf '{}' | PROV_POINTER=/tmp/verify_prov_none.toml CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/session_start.sh' | rg -q 'install_prov.sh <release tag>'"
+
 tc="$REPO_DIR/.claude/skills/tmux-control/scripts/tmux_control.sh"
 tc_env="CLAUDE_CODE_SESSION_ID=verify-$$"
 run_expect "tmux-control root request: user-owned session + sudo -i, never sudo tmux" 0 bash -lc "$tc_env '$tc' root-request --session root-verify --cwd '$REPO_DIR' --command 'true' >/tmp/verify_root_request.out && rg -q 'tmux attach -t root-verify' /tmp/verify_root_request.out && ! rg -q 'sudo tmux|paste the output|in-session ! sudo.*alternative' /tmp/verify_root_request.out && tmux has-session -t root-verify && tmux capture-pane -p -J -t root-verify | rg -q 'sudo -i'; rc=\$?; $tc_env '$tc' stop --session root-verify >/dev/null; exit \$rc"

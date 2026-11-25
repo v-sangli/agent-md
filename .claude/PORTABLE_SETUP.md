@@ -16,7 +16,7 @@ zip
 unzip
 ```
 
-`uv` and `claude` as well, for step 5.
+`git` and `uv` as well, for step 5.
 
 ## 1) Create and transfer archive
 
@@ -81,17 +81,23 @@ This checks:
 
 ## 5) Install prov (once per machine)
 
-The research rules use `prov`, its `prov-journal` CLI and the `prov-skills` plugin. They are
-installed once per machine, not per workspace, at one prov release tag (ADR 0011):
+The research rules use `prov`, its `prov-journal` CLI and its skills. They are installed once
+per machine, not per workspace, from one clone at a prov release tag (ADR 0011):
 
 ```bash
-bash .claude-workflow/install_prov.sh <tag>      # e.g. prov-skills-v0.2.0
+bash .claude-workflow/install_prov.sh <tag>      # e.g. prov-v0.6.1
 ```
 
-It installs both CLIs with `uv tool install` and the plugin at user scope, so every workspace
-on the machine uses the same version. Rerun it with a newer tag to upgrade. `PROV_REPO`
-overrides the prov repo. The machine's prov config, registry and store are set up as the prov
-README says.
+- The clone lives at `~/.local/share/prov` (`PROV_HOME`), detached at the tag, with its own
+  venv holding `prov` and `prov-journal`.
+- `prov` and `prov-journal` are linked into `~/.local/bin`; the skills `prov`, `prov-journal`
+  and `prov-plot` into `~/.claude/skills/`, so every workspace sees them.
+- `~/.config/prov/install.toml` records the clone, tag and commit; session start reads it and
+  says whether prov is installed.
+- A run that imports prov installs it into its own environment from the same clone:
+  `uv pip install ~/.local/share/prov/packages/prov`.
+- Rerun with a newer tag to upgrade. The machine's prov config, registry and store are set up
+  as the prov README says.
 
 ## 6) Verify live Claude integration
 
