@@ -116,6 +116,8 @@ need_file ".claude/skills/superpowers/AGENTS.md"
 need_file ".claude/skills/superpowers/skills/using-superpowers/SKILL.md"
 need_file ".claude/skills/superpowers/skills/brainstorming/SKILL.md"
 need_file ".claude/skills/shipping-and-launch/SKILL.md"
+need_file ".claude/skills/agent-docs/SKILL.md"
+need_file ".claude/skills/agent-docs/scripts/agent_docs.sh"
 
 need_absent ".claude-log"
 need_absent ".claude-tools"
@@ -214,6 +216,7 @@ shopt -u nullglob
 
 if printf '%s' "$standalone_names" | rg -qx 'tmux-control' &&
   printf '%s' "$standalone_names" | rg -qx 'dev-flow' &&
+  printf '%s' "$standalone_names" | rg -qx 'agent-docs' &&
   [ "$plugin_skill_count" -ge 13 ] &&
   printf '%s' "$plugin_skill_names" | rg -qx 'superpowers:using-superpowers' &&
   [ "$skill_bad" -eq 0 ]; then
