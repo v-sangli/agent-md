@@ -2,7 +2,7 @@
 
 Status: Accepted (2026-11-25)
 Covers: `.claude/settings.json` (`permissions.ask`), `.claude/policy/OPERATING_SPEC.md` (§2, §9 criterion 6)
-PR: pending
+PR: https://github.com/v-sangli/agent-md/pull/9
 
 ## Context
 
