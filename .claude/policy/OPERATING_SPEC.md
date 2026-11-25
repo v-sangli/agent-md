@@ -1,6 +1,6 @@
 # Claude Operating Specification
 
-Version: 3.7
+Version: 3.8
 Scope: Current advisory Claude Code workspace/harness in this repository.
 
 `CLAUDE.md` is the canonical rule source. This file explains how the
@@ -82,8 +82,8 @@ Every other external scope needs the user's go-ahead in conversation.
 `.claude/**` is setup configuration — edited during harness maintenance, left
 alone during ordinary tasks.
 
-Claude Code native permissions carry the remaining hard edges: `git push`,
-`git reset --hard`, and `sudo` sit on the `ask` list; everything else is
+Claude Code native permissions carry the remaining hard edges:
+`git reset --hard` and `sudo` sit on the `ask` list; everything else is
 allowed. Keep permission rules relative or tool-level — no machine-specific
 absolute paths in `settings.json`.
 
@@ -225,8 +225,8 @@ Setup is considered correct when all are true:
    stronger rule layer.
 5. `settings.json` registers only the SessionStart and SessionEnd hooks, allows tools broadly,
    and contains no machine-specific absolute paths.
-6. `git push`, `git reset --hard`, and `sudo` remain on the permissions `ask`
-   list.
+6. `git reset --hard` and `sudo` remain on the permissions `ask` list; `git push`
+   does not (ADR 0013).
 7. Workspace facts live in `~/.agent-docs/`, outside the template, and
    `CLAUDE.md` imports its index.
 8. A rule is stated once: `CLAUDE.md` for standing rules, `dev-flow` for the
