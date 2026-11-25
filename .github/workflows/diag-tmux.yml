@@ -17,11 +17,11 @@ jobs:
             echo "rc=$?"
             echo "--- pane -J"; tmux capture-pane -p -J -t verify-wrap:control.0 -S -200 | cat -A | grep -v '^\$$' | tail -10
             tmux list-panes -t verify-wrap -F '#{pane_id} #{pane_width}x#{pane_height} role=#{@role}'
-            $tc_env "$tc" stop --session verify-wrap >/dev/null
+            env $tc_env "$tc" stop --session verify-wrap >/dev/null
           }
           echo "=== 1 standalone"; check || true
           echo "=== 2 after root-request"
-          bash -lc "$tc_env '$tc' root-request --session root-verify --cwd '$PWD' --command 'true' >/dev/null"; $tc_env "$tc" stop --session root-verify >/dev/null
+          bash -lc "$tc_env '$tc' root-request --session root-verify --cwd '$PWD' --command 'true' >/dev/null"; env $tc_env "$tc" stop --session root-verify >/dev/null
           check || true
           echo "=== 3 after full verifier"
           bash .claude/verify_setup.sh 2>&1 | grep -E "FAIL|SUMMARY" || true
