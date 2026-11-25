@@ -347,6 +347,13 @@ printf 'home = "/opt/prov"\nref = "prov-v9.9.9"\ncommit = "abcdef0123456789"\nbi
 run_expect "session_start reports the installed prov from its pointer file" 0 bash -c "printf '{}' | PROV_POINTER=/tmp/verify_prov_pointer.toml CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/session_start.sh' | rg -q '^PROV: prov-v9.9.9 \(abcdef0\) at /opt/prov$'"
 run_expect "session_start says how to install prov when there is no pointer file" 0 bash -c "printf '{}' | PROV_POINTER=/tmp/verify_prov_none.toml CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/session_start.sh' | rg -q 'install_prov.sh <release tag>'"
 
+# The workspace journal at session start (ADR 0015): named inside a prov project, or how to create it.
+rm -rf /tmp/verify_prov_ws /tmp/verify_prov_ws_bare && mkdir -p /tmp/verify_prov_ws/journal /tmp/verify_prov_ws_bare
+printf 'project = "ws"\n' | tee /tmp/verify_prov_ws/prov.toml >/tmp/verify_prov_ws_bare/prov.toml
+printf '# Now\n' >/tmp/verify_prov_ws/journal/NOW.md
+run_expect "session_start names the workspace journal as the home for docs" 0 bash -c "printf '{}' | CLAUDE_PROJECT_DIR=/tmp/verify_prov_ws bash '$REPO_DIR/.claude/hooks/session_start.sh' 2>/dev/null | rg -q '^- Journal: /tmp/verify_prov_ws/journal, the default home for docs'"
+run_expect "session_start says how to create the journal when a prov project has none" 0 bash -c "printf '{}' | CLAUDE_PROJECT_DIR=/tmp/verify_prov_ws_bare bash '$REPO_DIR/.claude/hooks/session_start.sh' 2>/dev/null | rg -q 'No journal yet: run prov-journal init in /tmp/verify_prov_ws_bare'"
+
 tc="$REPO_DIR/.claude/skills/tmux-control/scripts/tmux_control.sh"
 tc_env="CLAUDE_CODE_SESSION_ID=verify-$$"
 run_expect "tmux-control root request: user-owned session + sudo -i, never sudo tmux" 0 bash -lc "$tc_env '$tc' root-request --session root-verify --cwd '$REPO_DIR' --command 'true' >/tmp/verify_root_request.out && rg -q 'tmux attach -t root-verify' /tmp/verify_root_request.out && ! rg -q 'sudo tmux|paste the output|in-session ! sudo.*alternative' /tmp/verify_root_request.out && tmux has-session -t root-verify && tmux capture-pane -p -J -t root-verify | rg -q 'sudo -i'; rc=\$?; $tc_env '$tc' stop --session root-verify >/dev/null; exit \$rc"
