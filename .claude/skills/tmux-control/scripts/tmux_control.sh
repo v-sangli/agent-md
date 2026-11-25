@@ -103,12 +103,17 @@ cmd_start() {
     fi
     tmux select-pane -t "$pane" -T "$role"
     tmux set-option -p -t "$pane" @role "$role"
-    send_keys "$pane" "cd $(printf '%q' "$root")"
   done
 
   if [ "${#role_list[@]}" -gt 1 ]; then
     tmux select-layout -t "$session:control" tiled >/dev/null
   fi
+  # The splits and the layout resized the panes while their shells were starting. A shell that
+  # takes that resize mid-start later redraws its prompt one row up, over the last line a
+  # command printed. Restart each shell now that its pane has its final size.
+  tmux list-panes -t "$session:control" -F '#{pane_id}' | while read -r pane; do
+    tmux respawn-pane -k -t "$pane" -c "$root"
+  done
   tmux select-pane -t "$first"
 
   printf 'Started tmux session: %s\n' "$session"
