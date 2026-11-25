@@ -243,11 +243,15 @@ temp copy of `extra-key/`.
 `CLAUDE.md`, replacing the ENV.md pointer:
 
 ```markdown
-- `~/.agent-docs/`: workspace facts (clusters, environments, devices), kept by the
-  `agent-docs` skill. Its index:
+- `~/.agent-docs/`: workspace facts, kept by the `agent-docs` skill; its index follows.
+- `CLAUDE.local.md`, where present: this machine's own rules. Hosts, machine paths and repo
+  names belong there or in `~/.agent-docs/`, and nowhere in this file.
 
 @~/.agent-docs/INDEX.md
 ```
+
+(Amended after the checkpoint: no examples in the prompt text, at the user's earlier
+instruction; and the `CLAUDE.local.md` line now names the store, since hosts are facts.)
 
 Conventions › Environment: "Before Python, pytest, uv, dependency, install or build work,
 read the agent doc that covers the environment and use the default it names. Do not use
