@@ -14,7 +14,7 @@ they share one registry, store and config.
 - `.claude-workflow/install_prov.sh <ref>` installs, at one prov ref (a release tag):
   the `prov` and `prov-journal` CLIs with `uv tool install`, and the `prov-skills` plugin at
   user scope from the `prov` marketplace pinned to that ref. Run again with the same ref it
-  changes nothing; with a new ref it moves everything to it. No argument: usage, exit 2.
+  ends in the same state; with a new ref it moves everything to it. No argument: usage, exit 2.
 - `PORTABLE_SETUP.md` gains the step. CLAUDE.md's Research work names the plugin and says an
   ID or alias is resolved with prov, not guessed.
 - No submodule, no copy of prov in the harness.
