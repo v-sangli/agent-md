@@ -72,6 +72,7 @@ This checks:
 - `tmux-control` is installed in `.claude/skills/tmux-control/`
 - `dev-flow` is installed in `.claude/skills/dev-flow/`, with its two reference files
 - `shipping-and-launch` is installed in `.claude/skills/shipping-and-launch/`
+- `agent-docs` is installed in `.claude/skills/agent-docs/`, and its script passes its fixture stores
 - Superpowers is installed as `.claude/skills/superpowers/`, preserving its plugin namespace and repo glue files.
 - settings.json is advisory: `SessionStart`/`SessionEnd` only, no blocking hooks, no machine-specific absolute paths
 - session bootstrap works
@@ -106,6 +107,7 @@ Requires working Claude login/org entitlement. If `.claude/skills/` was created 
 Inside Claude Code:
 
 - `/memory` should show the intended project `CLAUDE.md`.
+- On the first start in a workspace, Claude Code asks to allow the external import of `~/.agent-docs/INDEX.md`: allow it. The session-start output then shows `agent-docs: OK (<n> docs)`, or why the store is not valid.
 - `/` should show project skills such as `tmux-control` and `dev-flow`.
 - Direct project skill invocations such as `/tmux-control` should resolve.
 - Plugin-scoped Superpowers invocations such as `/superpowers:using-superpowers` and `/superpowers:brainstorming` should resolve.
@@ -127,6 +129,6 @@ Inside Claude Code:
 
 - `.claude` contains project settings, hooks, project skills, and vendored project-scope plugins.
 - `.claude/policy/` contains the current lean runtime rules and operating specification. It intentionally does not restore the old `.claude-log`, `.claude-tools`, or hash-drift runtime.
-- `.claude/ENV.md` contains the default Python environment contract, and is the one file expected to be machine-specific. On a new machine, rewrite it to name that machine's activation script and environment; everything else in `.claude/` is meant to be portable as-is.
+- Nothing in `.claude/` is machine-specific. Workspace facts live in the user-scoped store `~/.agent-docs/`, outside the template; on a new machine it starts empty and the `agent-docs` skill fills it.
 - `.claude-log` and `.claude-tools` are intentionally not part of this lean setup.
 - `CLAUDE.md` is part of the template and names no host, machine path or repo. One machine's own rules go in `CLAUDE.local.md` at the workspace root, which Claude Code loads alongside `CLAUDE.md`. That file is not bundled and not synced; write it per machine.

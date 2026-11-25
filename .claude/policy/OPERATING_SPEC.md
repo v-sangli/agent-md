@@ -1,6 +1,6 @@
 # Claude Operating Specification
 
-Version: 3.6
+Version: 3.7
 Scope: Current advisory Claude Code workspace/harness in this repository.
 
 `CLAUDE.md` is the canonical rule source. This file explains how the
@@ -36,8 +36,8 @@ ours, and then it is established where a fresh session reads it.
 The template is environment-neutral. `CLAUDE.md` names no host, machine path
 or repo. One machine's own rules live in `CLAUDE.local.md` at the workspace
 root, which Claude Code loads alongside `CLAUDE.md`; it is not bundled or
-synced. `.claude/ENV.md` remains the one template file that is rewritten per
-machine.
+synced. Workspace facts live in the user-scoped store `~/.agent-docs/`
+(section 5), outside the template; no template file is rewritten per machine.
 
 How the text is edited:
 
@@ -61,9 +61,10 @@ DEVIATIONS.md                     the deviation registry (code stance rule 6)
 .claude-workflow/install_prov.sh prov once per machine: clone, venv, CLI and skill links, pointer file
 .claude/skills/dev-flow/          order of work for a code change, request to merge;
                                   references/ holds a worked sketch and the ADR template
-.claude/ENV.md                    environment identity and activation commands
+.claude/skills/agent-docs/        the workspace facts store: procedure, index/check script,
+                                  fixtures (section 5)
 .claude/settings.json             SessionStart/SessionEnd hooks + broad permission grants
-.claude/hooks/session_start.sh    state reinjection at session start, and prov's install status
+.claude/hooks/session_start.sh    state reinjection at session start: prov's install status, the agent-docs check
 .claude/hooks/session_end.sh      safety-net cleanup of this session's idle tmux sessions
 .claude/skills/tmux-control/      visible shell/root workflow helper
 .claude/skills/shipping-and-launch/ releases: the fifth gate, after merge; copied and
@@ -74,9 +75,12 @@ DEVIATIONS.md                     the deviation registry (code stance rule 6)
 ## 2. Access Model
 
 Normal repository files are the default working area. Writes and deletes stay
-inside the workspace by convention; external scope needs the user's go-ahead in
-conversation, not a config grant. `.claude/**` is setup configuration — edited
-during harness maintenance, left alone during ordinary tasks.
+inside the workspace by convention. The one exception is `~/.agent-docs/`, the
+workspace facts store (section 5, ADR 0012): a standing grant, both in `CLAUDE.md`
+(Workspace boundary) and in `settings.json` (`permissions.additionalDirectories`).
+Every other external scope needs the user's go-ahead in conversation.
+`.claude/**` is setup configuration — edited during harness maintenance, left
+alone during ordinary tasks.
 
 Claude Code native permissions carry the remaining hard edges: `git push`,
 `git reset --hard`, and `sudo` sit on the `ask` list; everything else is
@@ -107,15 +111,27 @@ surface password prompts. The desired behavior is:
    with `sudo -i`; a `sudo tmux` server would be root-owned and unreachable by
    the agent.
 
-## 5. Environment Boundary
+## 5. Workspace Facts
 
-`.claude/ENV.md` identifies the default conda environment and validation
-commands. Behavioral constraints such as avoiding durable `PYTHONPATH=.`
-workarounds live in `CLAUDE.md` so environment details do not become a
-second policy file.
+Facts needed to work with the user's tools, hosts and repos live in one
+user-scoped store, `~/.agent-docs/` (ADR 0012): untracked, never bundled, a
+tree of markdown docs by concern, each opening with a closed one-line
+`description` frontmatter. `.claude/skills/agent-docs/scripts/agent_docs.sh`
+generates the store's `INDEX.md` and is its only validator. `CLAUDE.md`
+imports the index, so every session and subagent holds it; Claude Code asks
+once per workspace to allow that external import. The session hook prints
+`agent_docs.sh check`, because a missing store or a declined import is
+otherwise silent.
 
-Conda activation is shell state, so it is not encoded in `.claude/settings.json`
-`env`.
+Agent edits under `~/.claude` prompt whatever the allow rules, so the store
+sits outside it; `settings.json` lists it in
+`permissions.additionalDirectories`.
+
+The store holds facts, not rules. Behavioral constraints such as avoiding
+durable `PYTHONPATH=.` workarounds live in `CLAUDE.md`.
+
+Environment activation is shell state, so it is not encoded in
+`.claude/settings.json` `env`.
 
 ## 6. Change Discipline
 
@@ -134,8 +150,8 @@ every task into ceremony.
 
 ## 7. Skills And Plugins
 
-`tmux-control` and `dev-flow` are standalone project skills because they are
-part of this harness.
+`tmux-control`, `dev-flow` and `agent-docs` are standalone project skills because they
+are part of this harness.
 `superpowers` is copied as a complete project-scope plugin directory because
 its repo-level glue files matter. Avoid flattening third-party plugin repos
 unless the loss of their root metadata is intentional and documented.
@@ -211,7 +227,8 @@ Setup is considered correct when all are true:
    and contains no machine-specific absolute paths.
 6. `git push`, `git reset --hard`, and `sudo` remain on the permissions `ask`
    list.
-7. Environment details live in `.claude/ENV.md`.
+7. Workspace facts live in `~/.agent-docs/`, outside the template, and
+   `CLAUDE.md` imports its index.
 8. A rule is stated once: `CLAUDE.md` for standing rules, `dev-flow` for the
    order of work. Skills name a rule and do not restate it.
 9. `CLAUDE.md` is under 300 lines and names no host, machine path or repo.

@@ -97,7 +97,19 @@ need_command jq
 need_command rg
 need_command realpath
 
-need_file ".claude/ENV.md"
+need_absent ".claude/ENV.md"
+# ENV.md was replaced by the agent-docs store (ADR 0012). Only the ADRs (history), the
+# branch-only spec, plan and spikes, and this verifier (which asserts its absence) may
+# still name it. Other worktrees of the repo are their own checkouts and are skipped.
+env_refs="$(rg -l --hidden --no-messages 'ENV[.]md' "$REPO_DIR" \
+  -g '!.git' -g '!docs/adr/**' -g '!docs/superpowers/**' -g '!spikes/**' \
+  -g '!.claude/worktrees/**' -g '!.claude/verify_setup.sh' || true)"
+if [ -z "$env_refs" ]; then
+  pass "no file names the removed ENV.md"
+else
+  fail "no file names the removed ENV.md"
+  printf '%s\n' "$env_refs" | sed 's|^|        names it: |'
+fi
 need_file ".claude/policy/OPERATING_SPEC.md"
 need_file "docs/adr/0001-advisory-enforcement.md"
 need_file ".claude/settings.json"
@@ -116,6 +128,8 @@ need_file ".claude/skills/superpowers/AGENTS.md"
 need_file ".claude/skills/superpowers/skills/using-superpowers/SKILL.md"
 need_file ".claude/skills/superpowers/skills/brainstorming/SKILL.md"
 need_file ".claude/skills/shipping-and-launch/SKILL.md"
+need_file ".claude/skills/agent-docs/SKILL.md"
+need_file ".claude/skills/agent-docs/scripts/agent_docs.sh"
 need_file ".claude-workflow/install_prov.sh"
 
 need_absent ".claude-log"
@@ -147,21 +161,22 @@ need_absent ".claude/policy/AGENT_RULES.md"
 need_exec ".claude/hooks/session_start.sh"
 need_exec ".claude/hooks/session_end.sh"
 need_exec ".claude/skills/tmux-control/scripts/tmux_control.sh"
+need_exec ".claude/skills/agent-docs/scripts/agent_docs.sh"
 need_exec ".claude-workflow/install_prov.sh"
 
-# Portability: this harness is a general template. Only .claude/ENV.md may name
-# one machine's paths or environments — everything else must resolve through
-# $CLAUDE_PROJECT_DIR or a relative path. Vendored plugins are upstream content
-# and settings.local.json is machine-local, so both are out of scope. CLAUDE.md
-# is part of the template and is scanned too; one machine's rules live in
+# Portability: this harness is a general template. No file in it names one machine's
+# paths: everything resolves through $CLAUDE_PROJECT_DIR, ~ or a relative path, and
+# workspace facts live in the user-scoped store ~/.agent-docs/. Vendored plugins are
+# upstream content and settings.local.json is machine-local, so both are out of scope.
+# CLAUDE.md is part of the template and is scanned too; one machine's rules live in
 # CLAUDE.local.md, which is not.
 env_leaks="$(rg -l --no-messages '/home/[a-zA-Z]|/Users/[a-zA-Z]' "$REPO_DIR/.claude" "$REPO_DIR/CLAUDE.md" \
   -g '!**/skills/superpowers/**' \
-  -g '!**/ENV.md' -g '!**/settings.local.json' || true)"
+  -g '!**/settings.local.json' || true)"
 if [ -z "$env_leaks" ]; then
-  pass "harness is machine-portable: absolute home paths confined to ENV.md"
+  pass "harness is machine-portable: no absolute home paths"
 else
-  fail "harness is machine-portable: absolute home paths confined to ENV.md"
+  fail "harness is machine-portable: no absolute home paths"
   printf '%s\n' "$env_leaks" | sed 's|^|        leak: |'
 fi
 
@@ -215,6 +230,7 @@ shopt -u nullglob
 
 if printf '%s' "$standalone_names" | rg -qx 'tmux-control' &&
   printf '%s' "$standalone_names" | rg -qx 'dev-flow' &&
+  printf '%s' "$standalone_names" | rg -qx 'agent-docs' &&
   [ "$plugin_skill_count" -ge 13 ] &&
   printf '%s' "$plugin_skill_names" | rg -qx 'superpowers:using-superpowers' &&
   [ "$skill_bad" -eq 0 ]; then
@@ -248,23 +264,17 @@ else
   fail "CLAUDE.md is under 300 lines ($claude_lines)"
 fi
 
-env_ok=1
-for required in \
-  "bin/activate" \
-  "python -V" \
-  "which python" \
-  "CLAUDE.md"; do
-  rg -Fq "$required" "$REPO_DIR/.claude/ENV.md" || env_ok=0
+wiring_ok=1
+rg -qx '@~/\.agent-docs/INDEX\.md' "$REPO_DIR/CLAUDE.md" || wiring_ok=0
+jq -e '.permissions.additionalDirectories | index("~/.agent-docs") != null' \
+  "$REPO_DIR/.claude/settings.json" >/dev/null 2>&1 || wiring_ok=0
+for required in "OPERATING_SPEC.md" "agent-docs"; do
+  rg -Fq "$required" "$REPO_DIR/CLAUDE.md" || wiring_ok=0
 done
-for required in \
-  "OPERATING_SPEC.md" \
-  ".claude/ENV.md"; do
-  rg -Fq "$required" "$REPO_DIR/CLAUDE.md" || env_ok=0
-done
-if [ "$env_ok" -eq 1 ]; then
-  pass "environment contract is restored and referenced"
+if [ "$wiring_ok" -eq 1 ]; then
+  pass "agent-docs wiring: CLAUDE.md imports the index, settings add the store"
 else
-  fail "environment contract is restored and referenced"
+  fail "agent-docs wiring: CLAUDE.md imports the index, settings add the store"
 fi
 
 policy_ok=1
@@ -272,7 +282,7 @@ for required in \
   "## Conventions" \
   "not a gate" \
   "tmux-control" \
-  ".claude/ENV.md" \
+  "~/.agent-docs/" \
   "PYTHONPATH=." \
   "Five things need the user's word" \
   "**A release.**"; do
@@ -287,7 +297,7 @@ for required in \
   "docs/adr/" \
   "dev-flow" \
   "tmux-control" \
-  ".claude/ENV.md"; do
+  "~/.agent-docs/"; do
   rg -Fq "$required" "$REPO_DIR/.claude/policy/OPERATING_SPEC.md" || policy_ok=0
 done
 if rg -Fq ".claude-log" "$REPO_DIR/CLAUDE.md" "$REPO_DIR/.claude/policy/OPERATING_SPEC.md" ||
@@ -319,7 +329,7 @@ else
 fi
 
 ss_out="$(printf '{"session_id":"verify"}' | CLAUDE_PROJECT_DIR="$REPO_DIR" bash "$REPO_DIR/.claude/hooks/session_start.sh")"
-for key in "STATE REINJECTION" "SESSION_ID:" "RULE SOURCES:" "POINTERS:" '`sudo -i`' '`sudo tmux`'; do
+for key in "STATE REINJECTION" "SESSION_ID:" "RULE SOURCES:" "POINTERS:" "AGENT DOCS:" "agent-docs: " '`sudo -i`' '`sudo tmux`'; do
   if printf '%s\n' "$ss_out" | rg -q "$key"; then
     pass "session_start output contains $key"
   else
@@ -344,6 +354,54 @@ run_expect "tmux-control wait matches a line wider than the pane" 0 bash -lc "$t
 run_expect "tmux-control start: the first command's last output line survives the pane layout" 0 bash -lc "$tc_env '$tc' start --session verify-ready >/dev/null && $tc_env '$tc' send --target verify-ready::run --command 'echo READY' >/dev/null && $tc_env '$tc' wait --target verify-ready::run --pattern '^READY\$' --timeout 10 --interval 1 >/dev/null; rc=\$?; $tc_env '$tc' stop --session verify-ready >/dev/null; exit \$rc"
 run_expect "tmux-control cleanup stops only own non-kept sessions" 0 bash -lc "$tc_env '$tc' start --session verify-own >/dev/null && $tc_env '$tc' start --session verify-kept --keep >/dev/null && CLAUDE_CODE_SESSION_ID=verify-other-$$ '$tc' start --session verify-other >/dev/null && $tc_env '$tc' cleanup >/dev/null; ! tmux has-session -t verify-own 2>/dev/null && tmux has-session -t verify-kept && tmux has-session -t verify-other; rc=\$?; for s in verify-own verify-kept verify-other; do $tc_env '$tc' stop --session \$s >/dev/null; done; exit \$rc"
 run_expect "install_prov.sh without a ref prints its usage" 2 bash "$REPO_DIR/.claude-workflow/install_prov.sh"
+
+# agent-docs: the store script against its fixtures.
+ad="$REPO_DIR/.claude/skills/agent-docs/scripts/agent_docs.sh"
+adf="$REPO_DIR/.claude/skills/agent-docs/tests/fixtures"
+
+expect_agent_docs() { # LABEL EXIT PATTERN ROOT COMMAND
+  local rc
+  set +e
+  bash "$ad" --root "$4" "$5" >/tmp/verify_agent_docs.out 2>&1
+  rc=$?
+  set -e
+  if [ "$rc" -eq "$2" ] && rg -Fq -- "$3" /tmp/verify_agent_docs.out; then
+    pass "agent-docs: $1 (exit=$rc)"
+  else
+    fail "agent-docs: $1 (expected exit=$2 and '$3', got exit=$rc)"
+    sed 's/^/  output: /' /tmp/verify_agent_docs.out
+  fi
+}
+
+expect_agent_docs "valid store passes check" 0 "agent-docs: OK (4 docs)" "$adf/good" check
+expect_agent_docs "doc without frontmatter" 1 "doc.md: no frontmatter" "$adf/no-frontmatter" check
+expect_agent_docs "extra frontmatter key" 1 "doc.md: unknown or extra frontmatter key" "$adf/extra-key" check
+expect_agent_docs "wrong first frontmatter key" 1 "doc.md: unknown or extra frontmatter key" "$adf/wrong-key" check
+expect_agent_docs "empty description" 1 "doc.md: empty description" "$adf/empty-description" check
+expect_agent_docs "wrapped description" 1 "doc.md: description not on one line" "$adf/multiline-description" check
+expect_agent_docs "@ in a description" 1 "doc.md: description starts a word with @" "$adf/at-description" check
+expect_agent_docs "stale index" 1 "INDEX.md: index stale" "$adf/stale-index" check
+expect_agent_docs "missing root" 1 "does-not-exist: missing root" "$adf/does-not-exist" check
+
+ad_tmp="$(mktemp -d)"
+cp -R "$adf/good" "$ad_tmp/good"
+rm "$ad_tmp/good/INDEX.md"
+expect_agent_docs "missing index" 1 "INDEX.md: index missing" "$ad_tmp/good" check
+expect_agent_docs "index on a valid store" 0 "agent-docs: OK (4 docs)" "$ad_tmp/good" index
+if cmp -s "$adf/good/INDEX.md" "$ad_tmp/good/INDEX.md"; then
+  pass "agent-docs: index reproduces the golden INDEX.md"
+else
+  fail "agent-docs: index reproduces the golden INDEX.md"
+  diff "$adf/good/INDEX.md" "$ad_tmp/good/INDEX.md" | sed 's/^/  diff: /' || true
+fi
+cp -R "$adf/extra-key" "$ad_tmp/extra-key"
+expect_agent_docs "index refuses an invalid store" 1 "unknown or extra frontmatter key" "$ad_tmp/extra-key" index
+if cmp -s "$adf/extra-key/INDEX.md" "$ad_tmp/extra-key/INDEX.md"; then
+  pass "agent-docs: a refused index leaves INDEX.md unchanged"
+else
+  fail "agent-docs: a refused index leaves INDEX.md unchanged"
+fi
+rm -rf "$ad_tmp"
 
 printf '\nSUMMARY | PASS=%d FAIL=%d\n' "$pass_count" "$fail_count"
 if [ "$fail_count" -ne 0 ]; then
