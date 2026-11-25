@@ -1,6 +1,6 @@
 # Claude Operating Specification
 
-Version: 3.5
+Version: 3.5.1
 Scope: Current advisory Claude Code workspace/harness in this repository.
 
 `CLAUDE.md` is the canonical rule source. This file explains how the
