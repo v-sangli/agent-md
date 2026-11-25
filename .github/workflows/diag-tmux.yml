@@ -1,0 +1,26 @@
+name: diag-tmux
+on:
+  push:
+    branches: [fix/tmux-36-wrap]
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq tmux
+      - name: Reproduce
+        run: |
+          tmux -V
+          tc=.claude/skills/tmux-control/scripts/tmux_control.sh
+          bash $tc start --session diag
+          echo "--- panes"
+          tmux list-panes -a -F '#{pane_id} #{pane_width}x#{pane_height} role=#{@role} title=#{pane_title}'
+          bash $tc send --target diag::run --command 'printf %0120d%s\\n 0 WRAPEND'
+          sleep 3
+          for p in $(tmux list-panes -s -t diag -F '#{pane_id}'); do
+            echo "--- $p plain"; tmux capture-pane -p -t "$p" -S -200 | cat -A | tail -8
+            echo "--- $p -J";    tmux capture-pane -p -J -t "$p" -S -200 | cat -A | tail -8
+          done
+          echo "--- resolve diag::run"
+          grep -n "^resolve_target" -A25 $tc | head -40
+          bash $tc wait --target diag::run --pattern '0{100}WRAPEND' --timeout 3 --interval 1 || echo "WAIT FAILED"
