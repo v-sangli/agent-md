@@ -1,8 +1,8 @@
 # 0012. Workspace facts live in a user-scoped store, `~/.agent-docs/`
 
-Status: Proposed
+Status: Accepted (2026-11-25)
 Covers: `.claude/skills/agent-docs/`, `CLAUDE.md` (pointers, Conventions › Environment, Workspace boundary), `.claude/settings.json` (`permissions.additionalDirectories`), `.claude/hooks/session_start.sh`, `.claude/verify_setup.sh`, `.claude/ENV.md` (removed), `.claude/PORTABLE_SETUP.md`, `.claude-workflow/README.md`, `.claude/policy/OPERATING_SPEC.md` (§0, §1, §2, §5, §7, §9)
-PR: pending
+PR: pending; commits `6153b62` (spec), `1320291` (spike), `71ee7c6` (sketch), `9c4a83b` (plan, `docs/superpowers/plans/2026-11-25-agent-docs.md`), `01f7164`, `01217be`, `21c9045`, `c99c25f`, `e267f03`, `76044a1`, `934c65c`, `2e568d3`, `22c1410` (merge of `main`; renumbered from 0011)
 
 ## Context
 
