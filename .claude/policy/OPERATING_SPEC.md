@@ -74,9 +74,12 @@ DEVIATIONS.md                     the deviation registry (code stance rule 6)
 ## 2. Access Model
 
 Normal repository files are the default working area. Writes and deletes stay
-inside the workspace by convention; external scope needs the user's go-ahead in
-conversation, not a config grant. `.claude/**` is setup configuration — edited
-during harness maintenance, left alone during ordinary tasks.
+inside the workspace by convention. The one exception is `~/.agent-docs/`, the
+workspace facts store (section 5, ADR 0011): a standing grant, both in `CLAUDE.md`
+(Workspace boundary) and in `settings.json` (`permissions.additionalDirectories`).
+Every other external scope needs the user's go-ahead in conversation.
+`.claude/**` is setup configuration — edited during harness maintenance, left
+alone during ordinary tasks.
 
 Claude Code native permissions carry the remaining hard edges: `git push`,
 `git reset --hard`, and `sudo` sit on the `ask` list; everything else is
@@ -119,15 +122,15 @@ once per workspace to allow that external import. The session hook prints
 `agent_docs.sh check`, because a missing store or a declined import is
 otherwise silent.
 
-The store sits outside `~/.claude`, where Claude Code prompts for every agent
-edit whatever the allow rules; `settings.json` lists it in
+Agent edits under `~/.claude` prompt whatever the allow rules, so the store
+sits outside it; `settings.json` lists it in
 `permissions.additionalDirectories`.
 
 The store holds facts, not rules. Behavioral constraints such as avoiding
 durable `PYTHONPATH=.` workarounds live in `CLAUDE.md`.
 
-Conda activation is shell state, so it is not encoded in `.claude/settings.json`
-`env`.
+Environment activation is shell state, so it is not encoded in
+`.claude/settings.json` `env`.
 
 ## 6. Change Discipline
 
