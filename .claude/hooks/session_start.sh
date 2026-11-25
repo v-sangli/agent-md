@@ -58,7 +58,9 @@ done
 if [ -f "$dir/prov.toml" ]; then
   echo "- This workspace is a prov project (prov.toml at $dir): resolve any ID or alias with"
   echo "  prov show / trace / uses before assuming anything about it; cite IDs, never paths."
-  if [ -f "$dir/journal/NOW.md" ]; then
-    echo "- Read $dir/journal/NOW.md before starting work."
+  if [ -d "$dir/journal" ]; then
+    echo "- Journal: $dir/journal, the default home for docs; read its NOW.md before starting work."
+  else
+    echo "- No journal yet: run prov-journal init in $dir."
   fi
 fi
