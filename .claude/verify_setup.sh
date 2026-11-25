@@ -146,6 +146,7 @@ need_absent ".claude/policy/AGENT_RULES.md"
 need_exec ".claude/hooks/session_start.sh"
 need_exec ".claude/hooks/session_end.sh"
 need_exec ".claude/skills/tmux-control/scripts/tmux_control.sh"
+need_exec ".claude/skills/agent-docs/scripts/agent_docs.sh"
 
 # Portability: this harness is a general template. Only .claude/ENV.md may name
 # one machine's paths or environments — everything else must resolve through
@@ -335,6 +336,52 @@ tc_env="CLAUDE_CODE_SESSION_ID=verify-$$"
 run_expect "tmux-control root request: user-owned session + sudo -i, never sudo tmux" 0 bash -lc "$tc_env '$tc' root-request --session root-verify --cwd '$REPO_DIR' --command 'true' >/tmp/verify_root_request.out && rg -q 'tmux attach -t root-verify' /tmp/verify_root_request.out && ! rg -q 'sudo tmux|paste the output|in-session ! sudo.*alternative' /tmp/verify_root_request.out && tmux has-session -t root-verify && tmux capture-pane -p -J -t root-verify | rg -q 'sudo -i'; rc=\$?; $tc_env '$tc' stop --session root-verify >/dev/null; exit \$rc"
 run_expect "tmux-control wait matches a line wider than the pane" 0 bash -lc "$tc_env '$tc' start --session verify-wrap >/dev/null && $tc_env '$tc' send --target verify-wrap::run --command 'printf %0120d%s\\\\n 0 WRAPEND' >/dev/null && $tc_env '$tc' wait --target verify-wrap::run --pattern '0{100}WRAPEND' --timeout 5 --interval 1 >/dev/null; rc=\$?; $tc_env '$tc' stop --session verify-wrap >/dev/null; exit \$rc"
 run_expect "tmux-control cleanup stops only own non-kept sessions" 0 bash -lc "$tc_env '$tc' start --session verify-own >/dev/null && $tc_env '$tc' start --session verify-kept --keep >/dev/null && CLAUDE_CODE_SESSION_ID=verify-other-$$ '$tc' start --session verify-other >/dev/null && $tc_env '$tc' cleanup >/dev/null; ! tmux has-session -t verify-own 2>/dev/null && tmux has-session -t verify-kept && tmux has-session -t verify-other; rc=\$?; for s in verify-own verify-kept verify-other; do $tc_env '$tc' stop --session \$s >/dev/null; done; exit \$rc"
+
+# agent-docs: the store script against its fixtures.
+ad="$REPO_DIR/.claude/skills/agent-docs/scripts/agent_docs.sh"
+adf="$REPO_DIR/.claude/skills/agent-docs/tests/fixtures"
+
+expect_agent_docs() { # LABEL EXIT PATTERN ROOT COMMAND
+  local rc
+  set +e
+  bash "$ad" --root "$4" "$5" >/tmp/verify_agent_docs.out 2>&1
+  rc=$?
+  set -e
+  if [ "$rc" -eq "$2" ] && rg -Fq -- "$3" /tmp/verify_agent_docs.out; then
+    pass "agent-docs: $1 (exit=$rc)"
+  else
+    fail "agent-docs: $1 (expected exit=$2 and '$3', got exit=$rc)"
+    sed 's/^/  output: /' /tmp/verify_agent_docs.out
+  fi
+}
+
+expect_agent_docs "valid store passes check" 0 "agent-docs: OK (4 docs)" "$adf/good" check
+expect_agent_docs "doc without frontmatter" 1 "doc.md: no frontmatter" "$adf/no-frontmatter" check
+expect_agent_docs "extra frontmatter key" 1 "doc.md: unknown or extra frontmatter key" "$adf/extra-key" check
+expect_agent_docs "empty description" 1 "doc.md: empty description" "$adf/empty-description" check
+expect_agent_docs "wrapped description" 1 "doc.md: description not on one line" "$adf/multiline-description" check
+expect_agent_docs "stale index" 1 "INDEX.md: index stale" "$adf/stale-index" check
+expect_agent_docs "missing root" 1 "does-not-exist: missing root" "$adf/does-not-exist" check
+
+ad_tmp="$(mktemp -d)"
+cp -R "$adf/good" "$ad_tmp/good"
+rm "$ad_tmp/good/INDEX.md"
+expect_agent_docs "missing index" 1 "INDEX.md: index missing" "$ad_tmp/good" check
+expect_agent_docs "index on a valid store" 0 "agent-docs: OK (4 docs)" "$ad_tmp/good" index
+if cmp -s "$adf/good/INDEX.md" "$ad_tmp/good/INDEX.md"; then
+  pass "agent-docs: index reproduces the golden INDEX.md"
+else
+  fail "agent-docs: index reproduces the golden INDEX.md"
+  diff "$adf/good/INDEX.md" "$ad_tmp/good/INDEX.md" | sed 's/^/  diff: /' || true
+fi
+cp -R "$adf/extra-key" "$ad_tmp/extra-key"
+expect_agent_docs "index refuses an invalid store" 1 "unknown or extra frontmatter key" "$ad_tmp/extra-key" index
+if cmp -s "$adf/extra-key/INDEX.md" "$ad_tmp/extra-key/INDEX.md"; then
+  pass "agent-docs: a refused index leaves INDEX.md unchanged"
+else
+  fail "agent-docs: a refused index leaves INDEX.md unchanged"
+fi
+rm -rf "$ad_tmp"
 
 printf '\nSUMMARY | PASS=%d FAIL=%d\n' "$pass_count" "$fail_count"
 if [ "$fail_count" -ne 0 ]; then
