@@ -163,9 +163,9 @@ Conventions and defaults, not gates: no tool call is blocked (see
 `.claude/policy/OPERATING_SPEC.md`). Follow them unless there is a concrete reason not to.
 
 - **Workspace boundary.** Write/delete work stays inside the repo unless the user grants
-  external scope. `~/.agent-docs/` is in scope: write it without asking (`agent-docs`
-  skill). Treat `.claude/**` as setup configuration: edit it for harness maintenance, not
-  as part of ordinary task work.
+  external scope. `~/.agent-docs/` is in scope; the `agent-docs` skill says when to ask.
+  Treat `.claude/**` as setup configuration: edit it for harness maintenance, not as part
+  of ordinary task work.
 - **Shell execution.** Direct Bash is fine for any command, `rm -rf` inside the workspace
   included. Prefer `tmux-control` for tests, installs, builds, benchmarks, nested agents and
   long-running work: a visible, attachable session and a durable log; this is
