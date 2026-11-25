@@ -203,6 +203,9 @@ These apply to subagents and Monitor/watcher commands too.
   exit status directly; no `$(pgrep ...)` + `kill -0` needed. The bracket around the first
   character keeps `pgrep -f` from matching the waiting loop's own command line — without it
   the loop matches itself and never exits.
+- A command that should run only if another succeeds goes after it: chained with `&&`, or
+  in a later turn once its result is seen. Never in the same batch of parallel calls: a
+  parallel call runs even when its sibling fails or is denied.
 
 ## Karpathy guidelines
 
