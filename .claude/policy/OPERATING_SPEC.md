@@ -1,6 +1,6 @@
 # Claude Operating Specification
 
-Version: 3.5.1
+Version: 3.6
 Scope: Current advisory Claude Code workspace/harness in this repository.
 
 `CLAUDE.md` is the canonical rule source. This file explains how the
@@ -58,11 +58,12 @@ docs/adr/                         harness decisions and their history (not bundl
 .github/workflows/verify.yml      CI: verify_setup.sh, and the merge gate (scripts/pr_gate.py)
 scripts/pr_gate.py                merge checks: ADR numbers, deviations, branch-only files, version
 DEVIATIONS.md                     the deviation registry (code stance rule 6)
+.claude-workflow/install_prov.sh prov once per machine: clone, venv, CLI and skill links, pointer file
 .claude/skills/dev-flow/          order of work for a code change, request to merge;
                                   references/ holds a worked sketch and the ADR template
 .claude/ENV.md                    environment identity and activation commands
 .claude/settings.json             SessionStart/SessionEnd hooks + broad permission grants
-.claude/hooks/session_start.sh    state reinjection at session start
+.claude/hooks/session_start.sh    state reinjection at session start, and prov's install status
 .claude/hooks/session_end.sh      safety-net cleanup of this session's idle tmux sessions
 .claude/skills/tmux-control/      visible shell/root workflow helper
 .claude/skills/shipping-and-launch/ releases: the fifth gate, after merge; copied and
