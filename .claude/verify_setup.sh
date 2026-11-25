@@ -98,6 +98,18 @@ need_command rg
 need_command realpath
 
 need_absent ".claude/ENV.md"
+# ENV.md was replaced by the agent-docs store (ADR 0011). Only the ADRs (history), the
+# branch-only spec, plan and spikes, and this verifier (which asserts its absence) may
+# still name it. Other worktrees of the repo are their own checkouts and are skipped.
+env_refs="$(rg -l --hidden --no-messages 'ENV[.]md' "$REPO_DIR" \
+  -g '!.git' -g '!docs/adr/**' -g '!docs/superpowers/**' -g '!spikes/**' \
+  -g '!.claude/worktrees/**' -g '!.claude/verify_setup.sh' || true)"
+if [ -z "$env_refs" ]; then
+  pass "no file names the removed ENV.md"
+else
+  fail "no file names the removed ENV.md"
+  printf '%s\n' "$env_refs" | sed 's|^|        names it: |'
+fi
 need_file ".claude/policy/OPERATING_SPEC.md"
 need_file "docs/adr/0001-advisory-enforcement.md"
 need_file ".claude/settings.json"
@@ -283,7 +295,7 @@ for required in \
   "docs/adr/" \
   "dev-flow" \
   "tmux-control" \
-  ".claude/ENV.md"; do
+  "~/.agent-docs/"; do
   rg -Fq "$required" "$REPO_DIR/.claude/policy/OPERATING_SPEC.md" || policy_ok=0
 done
 if rg -Fq ".claude-log" "$REPO_DIR/CLAUDE.md" "$REPO_DIR/.claude/policy/OPERATING_SPEC.md" ||
