@@ -1,7 +1,8 @@
 # 0015. Documentation defaults to the workspace's prov journal
 
-Status: Proposed
+Status: Accepted (2026-11-25)
 Covers: `CLAUDE.md` (Research work), `.claude/hooks/session_start.sh`, `.claude/verify_setup.sh`
+PR: (pending); commits `557d449` (spec), `fa3b650` (plan, `docs/superpowers/plans/2026-11-25-journal-default.md`), `c491a82` `11bd0d7`
 
 ## Context
 
