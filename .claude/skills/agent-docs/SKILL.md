@@ -22,7 +22,8 @@ it and adds to it; the agent keeps it current.
   ---
   ```
 
-  The body is free markdown.
+  The body is free markdown. A description never starts a word with `@`: the index is
+  imported, and `@` would import a file.
 - `INDEX.md` is generated from the descriptions. It is never edited by hand.
 - Facts, not rules. A line that tells the agent how to behave belongs in `CLAUDE.md`.
 - Real credentials are recorded as pointers: where the secret lives and how to fetch it.
@@ -32,7 +33,7 @@ it and adds to it; the agent keeps it current.
 
 `CLAUDE.md` imports the index, so it is in context. Before working with a tool, host,
 environment or device, read the doc the index names for it. If the session-start output
-reports the store missing or broken, tell the user.
+reports a problem with the store, fix it as "The script" says below.
 
 ## Write
 
@@ -61,5 +62,10 @@ with the change shown: it may be something the user wrote.
 - `check` validates every doc and that `INDEX.md` is current.
 
 Both print `agent-docs: OK (<n> docs)`, or exit 1 with `agent-docs: <path>: <reason>` for
-the first invalid doc, and `index` then leaves `INDEX.md` unchanged. Fix the doc it names
-and run it again.
+the first invalid doc, and `index` then leaves `INDEX.md` unchanged. What to do depends on
+what it names:
+
+- a doc: fix that doc, then run `index`;
+- `INDEX.md` (`index stale` or `index missing`): run `index`. A doc the user added by hand
+  leaves the index stale; regenerating it changes no content;
+- the root (`missing root`): the store is empty; the first doc written creates it.
