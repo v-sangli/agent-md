@@ -2,7 +2,7 @@
 
 Status: Accepted (2026-11-25)
 Covers: `CLAUDE.md` (Shell command shape)
-PR: pending
+PR: https://github.com/v-sangli/agent-md/pull/10
 
 ## Context
 
