@@ -97,7 +97,7 @@ need_command jq
 need_command rg
 need_command realpath
 
-need_file ".claude/ENV.md"
+need_absent ".claude/ENV.md"
 need_file ".claude/policy/OPERATING_SPEC.md"
 need_file "docs/adr/0001-advisory-enforcement.md"
 need_file ".claude/settings.json"
@@ -150,19 +150,19 @@ need_exec ".claude/hooks/session_end.sh"
 need_exec ".claude/skills/tmux-control/scripts/tmux_control.sh"
 need_exec ".claude/skills/agent-docs/scripts/agent_docs.sh"
 
-# Portability: this harness is a general template. Only .claude/ENV.md may name
-# one machine's paths or environments — everything else must resolve through
-# $CLAUDE_PROJECT_DIR or a relative path. Vendored plugins are upstream content
-# and settings.local.json is machine-local, so both are out of scope. CLAUDE.md
-# is part of the template and is scanned too; one machine's rules live in
+# Portability: this harness is a general template. No file in it names one machine's
+# paths: everything resolves through $CLAUDE_PROJECT_DIR, ~ or a relative path, and
+# workspace facts live in the user-scoped store ~/.agent-docs/. Vendored plugins are
+# upstream content and settings.local.json is machine-local, so both are out of scope.
+# CLAUDE.md is part of the template and is scanned too; one machine's rules live in
 # CLAUDE.local.md, which is not.
 env_leaks="$(rg -l --no-messages '/home/[a-zA-Z]|/Users/[a-zA-Z]' "$REPO_DIR/.claude" "$REPO_DIR/CLAUDE.md" \
   -g '!**/skills/superpowers/**' \
-  -g '!**/ENV.md' -g '!**/settings.local.json' || true)"
+  -g '!**/settings.local.json' || true)"
 if [ -z "$env_leaks" ]; then
-  pass "harness is machine-portable: absolute home paths confined to ENV.md"
+  pass "harness is machine-portable: no absolute home paths"
 else
-  fail "harness is machine-portable: absolute home paths confined to ENV.md"
+  fail "harness is machine-portable: no absolute home paths"
   printf '%s\n' "$env_leaks" | sed 's|^|        leak: |'
 fi
 
@@ -250,23 +250,17 @@ else
   fail "CLAUDE.md is under 300 lines ($claude_lines)"
 fi
 
-env_ok=1
-for required in \
-  "bin/activate" \
-  "python -V" \
-  "which python" \
-  "CLAUDE.md"; do
-  rg -Fq "$required" "$REPO_DIR/.claude/ENV.md" || env_ok=0
+wiring_ok=1
+rg -qx '@~/\.agent-docs/INDEX\.md' "$REPO_DIR/CLAUDE.md" || wiring_ok=0
+jq -e '.permissions.additionalDirectories | index("~/.agent-docs") != null' \
+  "$REPO_DIR/.claude/settings.json" >/dev/null 2>&1 || wiring_ok=0
+for required in "OPERATING_SPEC.md" "agent-docs"; do
+  rg -Fq "$required" "$REPO_DIR/CLAUDE.md" || wiring_ok=0
 done
-for required in \
-  "OPERATING_SPEC.md" \
-  ".claude/ENV.md"; do
-  rg -Fq "$required" "$REPO_DIR/CLAUDE.md" || env_ok=0
-done
-if [ "$env_ok" -eq 1 ]; then
-  pass "environment contract is restored and referenced"
+if [ "$wiring_ok" -eq 1 ]; then
+  pass "agent-docs wiring: CLAUDE.md imports the index, settings add the store"
 else
-  fail "environment contract is restored and referenced"
+  fail "agent-docs wiring: CLAUDE.md imports the index, settings add the store"
 fi
 
 policy_ok=1
@@ -274,7 +268,7 @@ for required in \
   "## Conventions" \
   "not a gate" \
   "tmux-control" \
-  ".claude/ENV.md" \
+  "~/.agent-docs/" \
   "PYTHONPATH=." \
   "Five things need the user's word" \
   "**A release.**"; do
@@ -321,7 +315,7 @@ else
 fi
 
 ss_out="$(printf '{"session_id":"verify"}' | CLAUDE_PROJECT_DIR="$REPO_DIR" bash "$REPO_DIR/.claude/hooks/session_start.sh")"
-for key in "STATE REINJECTION" "SESSION_ID:" "RULE SOURCES:" "POINTERS:" '`sudo -i`' '`sudo tmux`'; do
+for key in "STATE REINJECTION" "SESSION_ID:" "RULE SOURCES:" "POINTERS:" "AGENT DOCS:" "agent-docs: " '`sudo -i`' '`sudo tmux`'; do
   if printf '%s\n' "$ss_out" | rg -q "$key"; then
     pass "session_start output contains $key"
   else

@@ -26,6 +26,7 @@
   },
   "permissions": {
     "deny": [],
+    "additionalDirectories": ["~/.agent-docs"],
     "ask": [
       "Bash(git push:*)",
       "Bash(git reset --hard:*)",

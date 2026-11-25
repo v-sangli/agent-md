@@ -4,9 +4,11 @@ This repository is a Claude Code workspace/harness under active design. Before c
 structure, read `.claude/policy/OPERATING_SPEC.md`; record the decision as an ADR under
 `docs/adr/` and keep the spec describing the current design.
 
-- `.claude/ENV.md`: environment contract.
+- `~/.agent-docs/`: workspace facts, kept by the `agent-docs` skill; its index follows.
 - `CLAUDE.local.md`, where present: this machine's own rules. Hosts, machine paths and repo
-  names belong there and nowhere in this file.
+  names belong there or in `~/.agent-docs/`, and nowhere in this file.
+
+@~/.agent-docs/INDEX.md
 
 ## Code stance
 
@@ -161,8 +163,9 @@ Conventions and defaults, not gates: no tool call is blocked (see
 `.claude/policy/OPERATING_SPEC.md`). Follow them unless there is a concrete reason not to.
 
 - **Workspace boundary.** Write/delete work stays inside the repo unless the user grants
-  external scope. Treat `.claude/**` as setup configuration: edit it for harness
-  maintenance, not as part of ordinary task work.
+  external scope. `~/.agent-docs/` is in scope: write it without asking (`agent-docs`
+  skill). Treat `.claude/**` as setup configuration: edit it for harness maintenance, not
+  as part of ordinary task work.
 - **Shell execution.** Direct Bash is fine for any command, `rm -rf` inside the workspace
   included. Prefer `tmux-control` for tests, installs, builds, benchmarks, nested agents and
   long-running work: a visible, attachable session and a durable log; this is
@@ -176,9 +179,9 @@ Conventions and defaults, not gates: no tool call is blocked (see
   server the agent cannot reach). Send nothing before `^root@`; `stop` it when done.
 - **Subagent models.** Dispatch every subagent with `model: opus`. Do not tier models by
   task difficulty: better first implementations mean less debugging.
-- **Environment.** Read `.claude/ENV.md` before Python, pytest, uv, dependency, install,
-  or build work, and use the default environment it names unless the user overrides it.
-  Do not use `PYTHONPATH=.` as a durable fix.
+- **Environment.** Before Python, pytest, uv, dependency, install or build work, read the
+  agent doc that covers the environment and use the default it names unless the user
+  overrides it. Do not use `PYTHONPATH=.` as a durable fix.
 - **Code outside the repo.** Do not patch `site-packages`, system paths, external
   dependency checkouts, or other outside-repo code without explicit approval. Prefer
   in-repo fixes, dependency pins/upgrades, wrappers, or vendored patches.
