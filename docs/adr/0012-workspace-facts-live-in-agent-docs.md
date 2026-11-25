@@ -1,4 +1,4 @@
-# 0011. Workspace facts live in a user-scoped store, `~/.agent-docs/`
+# 0012. Workspace facts live in a user-scoped store, `~/.agent-docs/`
 
 Status: Proposed
 Covers: `.claude/skills/agent-docs/`, `CLAUDE.md` (pointers, Conventions › Environment, Workspace boundary), `.claude/settings.json` (`permissions.additionalDirectories`), `.claude/hooks/session_start.sh`, `.claude/verify_setup.sh`, `.claude/ENV.md` (removed), `.claude/PORTABLE_SETUP.md`, `.claude-workflow/README.md`, `.claude/policy/OPERATING_SPEC.md` (§0, §1, §2, §5, §7, §9)

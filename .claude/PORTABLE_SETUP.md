@@ -16,6 +16,8 @@ zip
 unzip
 ```
 
+`git` and `uv` as well, for step 5.
+
 ## 1) Create and transfer archive
 
 From the source repo root:
@@ -78,7 +80,27 @@ This checks:
 - `root-request` opens a user-owned tmux session with `sudo -i` waiting for the password, never `sudo tmux`
 - `cleanup` stops only the calling Claude session's tmux sessions
 
-## 5) Verify live Claude integration
+## 5) Install prov (once per machine)
+
+The research rules use `prov`, its `prov-journal` CLI and its skills. They are installed once
+per machine, not per workspace, from one clone at a prov release tag (ADR 0011):
+
+```bash
+bash .claude-workflow/install_prov.sh <tag>      # e.g. prov-v0.6.1
+```
+
+- The clone lives at `~/.local/share/prov` (`PROV_HOME`), detached at the tag, with its own
+  venv holding `prov` and `prov-journal`.
+- `prov` and `prov-journal` are linked into `~/.local/bin`; the skills `prov`, `prov-journal`
+  and `prov-plot` into `~/.claude/skills/`, so every workspace sees them.
+- `~/.config/prov/install.toml` records the clone, tag and commit; session start reads it and
+  says whether prov is installed.
+- A run that imports prov installs it into its own environment from the same clone:
+  `uv pip install ~/.local/share/prov/packages/prov`.
+- Rerun with a newer tag to upgrade. The machine's prov config, registry and store are set up
+  as the prov README says.
+
+## 6) Verify live Claude integration
 
 Requires working Claude login/org entitlement. If `.claude/skills/` was created after the current Claude Code session started, restart Claude Code first.
 
@@ -93,7 +115,7 @@ Inside Claude Code:
 - If `claude plugin list` says skills-dir plugins were not loaded because the workspace is not trusted, accept the workspace trust prompt in an interactive Claude Code session, then run `/reload-plugins` or restart.
 - To test copied Superpowers instead of user-scope Superpowers, disable or uninstall the user-scope plugin first.
 
-## 6) Common failure fixes
+## 7) Common failure fixes
 
 - `Your organization does not have access to Claude`:
   - run `claude auth status`

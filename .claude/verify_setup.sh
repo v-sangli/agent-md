@@ -98,7 +98,7 @@ need_command rg
 need_command realpath
 
 need_absent ".claude/ENV.md"
-# ENV.md was replaced by the agent-docs store (ADR 0011). Only the ADRs (history), the
+# ENV.md was replaced by the agent-docs store (ADR 0012). Only the ADRs (history), the
 # branch-only spec, plan and spikes, and this verifier (which asserts its absence) may
 # still name it. Other worktrees of the repo are their own checkouts and are skipped.
 env_refs="$(rg -l --hidden --no-messages 'ENV[.]md' "$REPO_DIR" \
@@ -130,6 +130,7 @@ need_file ".claude/skills/superpowers/skills/brainstorming/SKILL.md"
 need_file ".claude/skills/shipping-and-launch/SKILL.md"
 need_file ".claude/skills/agent-docs/SKILL.md"
 need_file ".claude/skills/agent-docs/scripts/agent_docs.sh"
+need_file ".claude-workflow/install_prov.sh"
 
 need_absent ".claude-log"
 need_absent ".claude-tools"
@@ -161,6 +162,7 @@ need_exec ".claude/hooks/session_start.sh"
 need_exec ".claude/hooks/session_end.sh"
 need_exec ".claude/skills/tmux-control/scripts/tmux_control.sh"
 need_exec ".claude/skills/agent-docs/scripts/agent_docs.sh"
+need_exec ".claude-workflow/install_prov.sh"
 
 # Portability: this harness is a general template. No file in it names one machine's
 # paths: everything resolves through $CLAUDE_PROJECT_DIR, ~ or a relative path, and
@@ -340,11 +342,18 @@ else
   pass "session_start output avoids removed scaffolding"
 fi
 
+# prov status at session start (ADR 0011): from the pointer file install_prov.sh writes.
+printf 'home = "/opt/prov"\nref = "prov-v9.9.9"\ncommit = "abcdef0123456789"\nbin = "/opt/bin"\nskills = "prov prov-journal prov-plot"\nusage = "/opt/prov/docs/usage.md"\n' >/tmp/verify_prov_pointer.toml
+run_expect "session_start reports the installed prov from its pointer file" 0 bash -c "printf '{}' | PROV_POINTER=/tmp/verify_prov_pointer.toml CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/session_start.sh' | rg -q '^PROV: prov-v9.9.9 \(abcdef0\) at /opt/prov$'"
+run_expect "session_start says how to install prov when there is no pointer file" 0 bash -c "printf '{}' | PROV_POINTER=/tmp/verify_prov_none.toml CLAUDE_PROJECT_DIR='$REPO_DIR' bash '$REPO_DIR/.claude/hooks/session_start.sh' | rg -q 'install_prov.sh <release tag>'"
+
 tc="$REPO_DIR/.claude/skills/tmux-control/scripts/tmux_control.sh"
 tc_env="CLAUDE_CODE_SESSION_ID=verify-$$"
 run_expect "tmux-control root request: user-owned session + sudo -i, never sudo tmux" 0 bash -lc "$tc_env '$tc' root-request --session root-verify --cwd '$REPO_DIR' --command 'true' >/tmp/verify_root_request.out && rg -q 'tmux attach -t root-verify' /tmp/verify_root_request.out && ! rg -q 'sudo tmux|paste the output|in-session ! sudo.*alternative' /tmp/verify_root_request.out && tmux has-session -t root-verify && tmux capture-pane -p -J -t root-verify | rg -q 'sudo -i'; rc=\$?; $tc_env '$tc' stop --session root-verify >/dev/null; exit \$rc"
 run_expect "tmux-control wait matches a line wider than the pane" 0 bash -lc "$tc_env '$tc' start --session verify-wrap >/dev/null && $tc_env '$tc' send --target verify-wrap::run --command 'printf %0120d%s\\\\n 0 WRAPEND' >/dev/null && $tc_env '$tc' wait --target verify-wrap::run --pattern '0{100}WRAPEND' --timeout 5 --interval 1 >/dev/null; rc=\$?; $tc_env '$tc' stop --session verify-wrap >/dev/null; exit \$rc"
+run_expect "tmux-control start: the first command's last output line survives the pane layout" 0 bash -lc "$tc_env '$tc' start --session verify-ready >/dev/null && $tc_env '$tc' send --target verify-ready::run --command 'echo READY' >/dev/null && $tc_env '$tc' wait --target verify-ready::run --pattern '^READY\$' --timeout 10 --interval 1 >/dev/null; rc=\$?; $tc_env '$tc' stop --session verify-ready >/dev/null; exit \$rc"
 run_expect "tmux-control cleanup stops only own non-kept sessions" 0 bash -lc "$tc_env '$tc' start --session verify-own >/dev/null && $tc_env '$tc' start --session verify-kept --keep >/dev/null && CLAUDE_CODE_SESSION_ID=verify-other-$$ '$tc' start --session verify-other >/dev/null && $tc_env '$tc' cleanup >/dev/null; ! tmux has-session -t verify-own 2>/dev/null && tmux has-session -t verify-kept && tmux has-session -t verify-other; rc=\$?; for s in verify-own verify-kept verify-other; do $tc_env '$tc' stop --session \$s >/dev/null; done; exit \$rc"
+run_expect "install_prov.sh without a ref prints its usage" 2 bash "$REPO_DIR/.claude-workflow/install_prov.sh"
 
 # agent-docs: the store script against its fixtures.
 ad="$REPO_DIR/.claude/skills/agent-docs/scripts/agent_docs.sh"
