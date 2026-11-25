@@ -148,7 +148,10 @@ skill: the order of work from request to merge, what each step produces and who 
 ## Research work
 
 - Experiment work lives on an `exp/` branch and is recorded with the project's provenance
-  tool (`prov`) and the skills it installs. Read the journal's `NOW.md` before starting.
+  tool (`prov`) and the skills of its `prov-skills` plugin. Read the journal's `NOW.md`
+  before starting.
+- An ID or alias from `prov` (`run_…`, `ds_…`, `doc_…`, `model:<name>/3`) is resolved with
+  `prov show`, `trace` or `uses` before anything is assumed about it (`prov-skills:prov`).
 - The provenance records are the trace. Every run, dataset and finding is registered
   there and persists whatever becomes of the branch. A finding cites the IDs it rests on.
 - When an experiment needs a feature, fix or refactor, that work goes on its own branch

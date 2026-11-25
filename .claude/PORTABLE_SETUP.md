@@ -16,6 +16,8 @@ zip
 unzip
 ```
 
+`uv` and `claude` as well, for step 5.
+
 ## 1) Create and transfer archive
 
 From the source repo root:
@@ -77,7 +79,21 @@ This checks:
 - `root-request` opens a user-owned tmux session with `sudo -i` waiting for the password, never `sudo tmux`
 - `cleanup` stops only the calling Claude session's tmux sessions
 
-## 5) Verify live Claude integration
+## 5) Install prov (once per machine)
+
+The research rules use `prov`, its `prov-journal` CLI and the `prov-skills` plugin. They are
+installed once per machine, not per workspace, at one prov release tag (ADR 0011):
+
+```bash
+bash .claude-workflow/install_prov.sh <tag>      # e.g. prov-skills-v0.2.0
+```
+
+It installs both CLIs with `uv tool install` and the plugin at user scope, so every workspace
+on the machine uses the same version. Rerun it with a newer tag to upgrade. `PROV_REPO`
+overrides the prov repo. The machine's prov config, registry and store are set up as the prov
+README says.
+
+## 6) Verify live Claude integration
 
 Requires working Claude login/org entitlement. If `.claude/skills/` was created after the current Claude Code session started, restart Claude Code first.
 
@@ -91,7 +107,7 @@ Inside Claude Code:
 - If `claude plugin list` says skills-dir plugins were not loaded because the workspace is not trusted, accept the workspace trust prompt in an interactive Claude Code session, then run `/reload-plugins` or restart.
 - To test copied Superpowers instead of user-scope Superpowers, disable or uninstall the user-scope plugin first.
 
-## 6) Common failure fixes
+## 7) Common failure fixes
 
 - `Your organization does not have access to Claude`:
   - run `claude auth status`
