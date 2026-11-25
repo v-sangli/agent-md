@@ -2,7 +2,7 @@
 
 Status: Accepted (2026-11-24)
 Covers: `.claude-workflow/install_prov.sh`, `.claude/PORTABLE_SETUP.md`, `CLAUDE.md` (Research work)
-PR: (pending); commits `7ca0e4a` (spec), `bfc11e8` (plan, `docs/superpowers/plans/2026-11-24-prov-integration.md`), `09b26c9`, `df89fad`
+PR: https://github.com/v-sangli/agent-md/pull/6; commits `7ca0e4a` (spec), `bfc11e8` (plan, `docs/superpowers/plans/2026-11-24-prov-integration.md`), `09b26c9`, `df89fad`
 
 ## Context
 
