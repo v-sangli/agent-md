@@ -152,6 +152,9 @@ skill: the order of work from request to merge, what each step produces and who 
 - Experiment work lives on an `exp/` branch and is recorded with the project's provenance
   tool (`prov`) and its skills (`prov`, `prov-journal`, `prov-plot`). Read the journal's
   `NOW.md` before starting. Session start says whether `prov` is installed on the machine.
+- Documentation goes to the workspace's `prov` journal by default: `journal/` beside the
+  workspace's `prov.toml`, a git repo of its own. Findings, plans, investigations and progress
+  notes are journal docs (the `prov-journal` skill); a note written elsewhere is folded in.
 - An ID or alias from `prov` (`run_…`, `ds_…`, `doc_…`, `model:<name>/3`) is resolved with
   `prov show`, `trace` or `uses` before anything is assumed about it (the `prov` skill).
 - The provenance records are the trace. Every run, dataset and finding is registered
