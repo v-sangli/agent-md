@@ -1,5 +1,8 @@
 {
   "permissions": {
     "allow": []
+  },
+  "skillOverrides": {
+    "anthropic-skills:xlsx": "off"
   }
 }

@@ -7,20 +7,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get update -qq && sudo apt-get install -y -qq tmux
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq tmux ripgrep jq
       - name: Reproduce
         run: |
-          tmux -V
-          tc=.claude/skills/tmux-control/scripts/tmux_control.sh
-          bash $tc start --session diag
-          echo "--- panes"
-          tmux list-panes -a -F '#{pane_id} #{pane_width}x#{pane_height} role=#{@role} title=#{pane_title}'
-          bash $tc send --target diag::run --command 'printf %0120d%s\\n 0 WRAPEND'
-          sleep 3
-          for p in $(tmux list-panes -s -t diag -F '#{pane_id}'); do
-            echo "--- $p plain"; tmux capture-pane -p -t "$p" -S -200 | cat -A | tail -8
-            echo "--- $p -J";    tmux capture-pane -p -J -t "$p" -S -200 | cat -A | tail -8
-          done
-          echo "--- resolve diag::run"
-          grep -n "^resolve_target" -A25 $tc | head -40
-          bash $tc wait --target diag::run --pattern '0{100}WRAPEND' --timeout 3 --interval 1 || echo "WAIT FAILED"
+          tc="$PWD/.claude/skills/tmux-control/scripts/tmux_control.sh"
+          tc_env="CLAUDE_CODE_SESSION_ID=verify-1"
+          check() {
+            bash -lc "$tc_env '$tc' start --session verify-wrap >/dev/null && $tc_env '$tc' send --target verify-wrap::run --command 'printf %0120d%s\\\\n 0 WRAPEND' >/dev/null && $tc_env '$tc' wait --target verify-wrap::run --pattern '0{100}WRAPEND' --timeout 5 --interval 1 >/dev/null"
+            echo "rc=$?"
+            echo "--- pane -J"; tmux capture-pane -p -J -t verify-wrap:control.0 -S -200 | cat -A | grep -v '^\$$' | tail -10
+            tmux list-panes -t verify-wrap -F '#{pane_id} #{pane_width}x#{pane_height} role=#{@role}'
+            $tc_env "$tc" stop --session verify-wrap >/dev/null
+          }
+          echo "=== 1 standalone"; check || true
+          echo "=== 2 after root-request"
+          bash -lc "$tc_env '$tc' root-request --session root-verify --cwd '$PWD' --command 'true' >/dev/null"; $tc_env "$tc" stop --session root-verify >/dev/null
+          check || true
+          echo "=== 3 after full verifier"
+          bash .claude/verify_setup.sh 2>&1 | grep -E "FAIL|SUMMARY" || true
+          check || true
