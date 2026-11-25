@@ -4,29 +4,30 @@ on:
     branches: [fix/tmux-36-wrap]
 jobs:
   diag:
+    strategy:
+      fail-fast: false
+      matrix:
+        n: [1, 2, 3, 4, 5, 6, 7, 8]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get update -qq && sudo apt-get install -y -qq tmux ripgrep jq
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq tmux
       - name: Reproduce
         run: |
           tc="$PWD/.claude/skills/tmux-control/scripts/tmux_control.sh"
-          tc_env="CLAUDE_CODE_SESSION_ID=verify-1"
-          check() {
-            bash -lc "$tc_env '$tc' start --session verify-wrap >/dev/null && $tc_env '$tc' send --target verify-wrap::run --command 'printf %0120d%s\\\\n 0 WRAPEND' >/dev/null && $tc_env '$tc' wait --target verify-wrap::run --pattern '0{100}WRAPEND' --timeout 5 --interval 1 >/dev/null"
-            echo "rc=$?"
-            tmux -V
-            for f in "" "-J" "-J -N" "-N"; do
-              echo "--- pane [$f]"; tmux capture-pane -p $f -t verify-wrap:control.0 -S -200 | cat -A | grep -v '^\$$' | tail -6
-            done
-            echo "--- printf to file"; printf %0120d%s\\n 0 WRAPEND | wc -c
-            tmux list-panes -t verify-wrap -F '#{pane_id} #{pane_width}x#{pane_height} role=#{@role}'
-            env $tc_env "$tc" stop --session verify-wrap >/dev/null
-          }
-          echo "=== 1 standalone"; check || true
-          echo "=== 2 after root-request"
-          bash -lc "$tc_env '$tc' root-request --session root-verify --cwd '$PWD' --command 'true' >/dev/null"; env $tc_env "$tc" stop --session root-verify >/dev/null
-          check || true
-          echo "=== 3 after full verifier"
-          bash .claude/verify_setup.sh 2>&1 | grep -E "FAIL|SUMMARY" || true
-          check || true
+          export CLAUDE_CODE_SESSION_ID=verify-1
+          hostname; tmux -V; bash --version | head -1
+          echo "=== A: send at once (as the verifier does)"
+          "$tc" start --session a >/dev/null
+          "$tc" send --target a::run --command 'printf %0120d%s\\n 0 WRAPEND' >/dev/null
+          for t in 0.3 1 3; do sleep $t; echo "--- plain after +$t"; tmux capture-pane -p -t a:control.0 -S -50 | grep -v '^$' | tail -5; done
+          "$tc" wait --target a::run --pattern '0{100}WRAPEND' --timeout 2 --interval 1 && echo "A: PASS" || echo "A: FAIL"
+          "$tc" stop --session a >/dev/null
+          echo "=== B: wait for the cd to finish first"
+          "$tc" start --session b >/dev/null
+          "$tc" send --target b::run --command 'echo READY' >/dev/null
+          "$tc" wait --target b::run --pattern '^READY$' --timeout 10 --interval 1 >/dev/null
+          "$tc" send --target b::run --command 'printf %0120d%s\\n 0 WRAPEND' >/dev/null
+          "$tc" wait --target b::run --pattern '0{100}WRAPEND' --timeout 5 --interval 1 && echo "B: PASS" || echo "B: FAIL"
+          tmux capture-pane -p -t b:control.0 -S -50 | grep -v '^$' | tail -5
+          "$tc" stop --session b >/dev/null
