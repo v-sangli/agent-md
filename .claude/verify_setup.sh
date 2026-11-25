@@ -367,8 +367,10 @@ expect_agent_docs() { # LABEL EXIT PATTERN ROOT COMMAND
 expect_agent_docs "valid store passes check" 0 "agent-docs: OK (4 docs)" "$adf/good" check
 expect_agent_docs "doc without frontmatter" 1 "doc.md: no frontmatter" "$adf/no-frontmatter" check
 expect_agent_docs "extra frontmatter key" 1 "doc.md: unknown or extra frontmatter key" "$adf/extra-key" check
+expect_agent_docs "wrong first frontmatter key" 1 "doc.md: unknown or extra frontmatter key" "$adf/wrong-key" check
 expect_agent_docs "empty description" 1 "doc.md: empty description" "$adf/empty-description" check
 expect_agent_docs "wrapped description" 1 "doc.md: description not on one line" "$adf/multiline-description" check
+expect_agent_docs "@ in a description" 1 "doc.md: description starts a word with @" "$adf/at-description" check
 expect_agent_docs "stale index" 1 "INDEX.md: index stale" "$adf/stale-index" check
 expect_agent_docs "missing root" 1 "does-not-exist: missing root" "$adf/does-not-exist" check
 

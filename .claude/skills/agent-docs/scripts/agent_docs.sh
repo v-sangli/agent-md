@@ -34,6 +34,7 @@ validate_doc() { # ROOT REL
     *) fail_store "$2" "unknown or extra frontmatter key" ;;
   esac
   [ -n "$(description_of "$1" "$2")" ] || fail_store "$2" "empty description"
+  [[ "$(description_of "$1" "$2")" =~ (^|[[:space:]])@ ]] && fail_store "$2" "description starts a word with @"
   if [ "$line3" != "---" ]; then
     if [[ "$line3" =~ ^[A-Za-z_][A-Za-z0-9_-]*: ]]; then
       fail_store "$2" "unknown or extra frontmatter key"
@@ -83,7 +84,8 @@ EOF
 cmd_index() { # ROOT
   local n
   n="$(validate_all "$1")"
-  render_index "$1" >"$1/INDEX.md"
+  render_index "$1" >"$1/.INDEX.md.tmp"
+  mv -f "$1/.INDEX.md.tmp" "$1/INDEX.md"
   printf 'agent-docs: OK (%d docs)\n' "$n"
 }
 
